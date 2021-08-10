@@ -1,0 +1,3 @@
+[submodule "source/amazon-kinesis-video-streams-webrtc-sdk-c"]
+	path = source/amazon-kinesis-video-streams-webrtc-sdk-c
+	url = https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git

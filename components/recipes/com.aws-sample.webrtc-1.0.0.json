@@ -1,0 +1,82 @@
+{
+  "RecipeFormatVersion": "2020-01-25",
+  "ComponentName": "USER_SETTING",
+  "ComponentVersion": "USER_SETTING",
+  "ComponentDescription": "The greengrass v2 webrtc app.",
+  "ComponentPublisher": "Amazon",
+  "ComponentDependencies": {
+    "aws.greengrass.TokenExchangeService": {
+      "VersionRequirement": "^2.0.0",
+      "DependencyType": "HARD"
+    },
+    "aws.greengrass.SecretManager": {
+      "VersionRequirement": "^2.0.0",
+      "DependencyType": "HARD"
+    }
+  },
+  "ComponentConfiguration": {
+    "DefaultConfiguration": {
+      "IpcTimeout" : "USER_SETTING",
+      "RecipesBucketName" : "USER_SETTING",
+      "SecretArn": "USER_SETTING",
+      "accessControl": {
+        "aws.greengrass.SecretManager": {
+          "USER_SETTING:secrets:1": {
+            "policyDescription": "Allows access to a secret.",
+            "operations": [
+              "aws.greengrass#GetSecretValue"
+            ],
+            "resources": [
+              "*"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Manifests": [
+    {
+      "Platform": {
+        "os": "linux"
+      },
+      "Lifecycle": {
+        "Install": {
+          "Script": "python3 -m pip install awsiotsdk && python3 -m pip install netifaces"
+        },
+        "Run": {
+          "Script": "python3 -u {artifacts:path}/run_webrtc.py '{artifacts:path}' '{configuration:/SecretArn}' '{configuration:/IpcTimeout}'"
+        }
+      },
+      "Artifacts": [
+        {
+          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/run_webrtc.py",
+          "Permission": {
+            "Read": "OWNER",
+            "Execute" : "OWNER"
+          }
+        },
+        {
+          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/kvsWebrtcClientMasterGstRtspSample",
+          "Permission": {
+            "Read": "OWNER",
+            "Execute" : "OWNER"
+          }
+        },
+        {
+          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/setting.json",
+          "Permission": {
+            "Read": "OWNER",
+            "Execute" : "OWNER"
+          }
+        },
+        {
+          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/AmazonRootCA1.pem",
+          "Permission": {
+            "Read": "OWNER",
+            "Execute" : "OWNER"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+    "RtspConfig": [
+      {
+        "ChannelName": "RtspCam1",
+        "RtspUrl": "rtsp://x.x.x.x:x/live.sdp",
+        "username": "admin",
+        "password": "admin"
+      },
+      {
+        "ChannelName": "RtspCam2",
+        "RtspUrl": "rtsp://x.x.x.x:x/live.sdp",
+        "username": "admin",
+        "password": "admin"
+      }
+    ]
+  }
