@@ -1,3 +1,7 @@
+---
+
+---
+
 ## aws-greengrass-kinesis-video-streams-webrtc-c
 
 This is an app that runs on [AWS IoT Greengrass v2](https://docs.aws.amazon.com/greengrass/v2/developerguide/what-is-iot-greengrass.html) gateway devices as a [Greengrass Component](https://docs.aws.amazon.com/greengrass/v2/developerguide/manage-components.html).  The app receives video streams from multiple IP cameras, allowing remote viewers to watch the streams using [Amazon Kinesis Video Stream WebRTC](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c). 
@@ -17,7 +21,7 @@ This is an app that runs on [AWS IoT Greengrass v2](https://docs.aws.amazon.com/
 
 ### Architecture
 
-![greengrass-kvswebrtc-app](/Users/ycyang/workplace/Greengrass-v2-kinesis-video-streams-webrtc/src/Greengrass-v2-kinesis-video-streams-webrtc/greengrass-kvswebrtc-app.png)
+![](greengrass-kvswebrtc-app.png)
 
 ### Build and Install the App
 
