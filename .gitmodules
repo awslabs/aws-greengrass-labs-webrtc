@@ -1,6 +1,7 @@
 [submodule "source/amazon-kinesis-video-streams-webrtc-sdk-c"]
 	path = source/amazon-kinesis-video-streams-webrtc-sdk-c
 	url = https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git
+
 [submodule "source/test/unit-test/CMock"]
 	path = source/test/unit-test/CMock
 	url = https://github.com/ThrowTheSwitch/CMock
