@@ -1,0 +1,1842 @@
+From 6bef16923378a6944ba519aae8fdb84292f191b0 Mon Sep 17 00:00:00 2001
+From: ycyang1229 <yc.yang1229@gmail.com>
+Date: Thu, 23 Sep 2021 17:14:23 +0800
+Subject: [PATCH] ecs-support
+
+---
+ 0001-ecs-support.patch.patch                  | 917 ++++++++++++++++++
+ .../libkvsCommonLws-CMakeLists.txt            |   9 +-
+ .../libkvsCommonLws-ecs-support.patch         | 709 ++++++++++++++
+ CMakeLists.txt                                |  12 +-
+ samples/Common.c                              |   1 -
+ src/source/Signaling/LwsApiCalls.c            |  54 +-
+ 6 files changed, 1671 insertions(+), 31 deletions(-)
+ create mode 100644 0001-ecs-support.patch.patch
+ create mode 100644 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
+
+diff --git a/0001-ecs-support.patch.patch b/0001-ecs-support.patch.patch
+new file mode 100644
+index 000000000..7d662ccad
+--- /dev/null
++++ b/0001-ecs-support.patch.patch
+@@ -0,0 +1,917 @@
++From 4ddd26bc50a2344bc23ef355508e0e12b895e872 Mon Sep 17 00:00:00 2001
++From: ycyang1229 <yc.yang1229@gmail.com>
++Date: Thu, 23 Sep 2021 17:13:04 +0800
++Subject: [PATCH] ecs-support.patch
++
++---
++ .../libkvsCommonLws-CMakeLists.txt            |   9 +-
++ .../libkvsCommonLws-ecs-support.patch         | 709 ++++++++++++++++++
++ CMakeLists.txt                                |  12 +-
++ samples/Common.c                              |   1 -
++ src/source/Signaling/LwsApiCalls.c            |  54 +-
++ 5 files changed, 754 insertions(+), 31 deletions(-)
++ create mode 100644 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
++
++diff --git a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
++index 2420be89b..8db195b1a 100644
++--- a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
+++++ b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
++@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 2.8)
++ 
++ project(libkvsCommonLws-download NONE)
++ 
+++SET(PATCH_COMMAND "")
+++
+++if (NOT WIN32)
+++    set(PATCH_COMMAND ${PATCH_COMMAND} git apply --ignore-whitespace ${CMAKE_CURRENT_LIST_DIR}/libkvsCommonLws-ecs-support.patch)
+++endif()
+++
++ include(ExternalProject)
++ 
++ ExternalProject_Add(libkvsCommonLws-download
++     GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
++-    GIT_TAG           d1095356712729d0489e56d1d0e27f5ce0a29fad
+++    GIT_TAG           a8091d1a140fbdcb260ba3c8302aa2e4712d2d91
+++    PATCH_COMMAND     ${PATCH_COMMAND}
++     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
++     CMAKE_ARGS        
++       -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
++diff --git a/CMake/Dependencies/libkvsCommonLws-ecs-support.patch b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
++new file mode 100644
++index 000000000..b3a39242f
++--- /dev/null
+++++ b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
++@@ -0,0 +1,709 @@
+++From 6725290bf69ff797aebeecf3f99ae9dba89283e8 Mon Sep 17 00:00:00 2001
+++From: yc yang <ycyang@amazon.com>
+++Date: Thu, 8 Jul 2021 22:17:24 +0800
+++Subject: [PATCH] ecs-support-patch
+++
+++---
+++ .../amazonaws/kinesis/video/common/Include.h  |  54 +++-
+++ src/source/Common/EcsCredentialProvider.c     | 293 ++++++++++++++++++
+++ src/source/Common/EcsCredentialProvider.h     |  64 ++++
+++ src/source/Common/Include_i.h                 |   2 +
+++ src/source/Common/IotCredentialProvider.c     |   2 +-
+++ src/source/Common/Lws/LwsCall.c               |  86 ++++-
+++ src/source/Common/Lws/LwsCall.h               |   1 +
+++ .../Common/Lws/LwsEcsCredentialProvider.c     |  16 +
+++ .../Common/Lws/LwsEcsCredentialProvider.h     |  16 +
+++ src/source/Common/RequestInfo.c               |   3 +-
+++ 10 files changed, 533 insertions(+), 4 deletions(-)
+++ create mode 100644 src/source/Common/EcsCredentialProvider.c
+++ create mode 100644 src/source/Common/EcsCredentialProvider.h
+++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.c
+++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.h
+++
+++diff --git a/src/include/com/amazonaws/kinesis/video/common/Include.h b/src/include/com/amazonaws/kinesis/video/common/Include.h
+++index 17080ca..b34256e 100644
+++--- a/src/include/com/amazonaws/kinesis/video/common/Include.h
++++++ b/src/include/com/amazonaws/kinesis/video/common/Include.h
+++@@ -50,6 +50,11 @@ extern "C" {
+++ #define STATUS_FILE_CREDENTIAL_PROVIDER_OPEN_FILE_FAILED    STATUS_COMMON_PRODUCER_BASE + 0x00000022
+++ #define STATUS_FILE_CREDENTIAL_PROVIDER_INVALID_FILE_LENGTH STATUS_COMMON_PRODUCER_BASE + 0x00000023
+++ #define STATUS_FILE_CREDENTIAL_PROVIDER_INVALID_FILE_FORMAT STATUS_COMMON_PRODUCER_BASE + 0x00000024
++++#define STATUS_ECS_AUTH_URI_FAILED                          STATUS_COMMON_PRODUCER_BASE + 0x00000025
++++#define STATUS_ECS_AUTH_FAILED                              STATUS_COMMON_PRODUCER_BASE + 0x00000026
++++#define STATUS_ECS_AUTH_RSP_FAILED                          STATUS_COMMON_PRODUCER_BASE + 0x00000027
++++#define STATUS_MAX_ECS_TOKEN_LENGTH                         STATUS_COMMON_PRODUCER_BASE + 0x00000028
++++#define STATUS_ECS_URI_LENGTH                               STATUS_COMMON_PRODUCER_BASE + 0x00000029
+++ /*!@} */
+++ 
+++ /**
+++@@ -137,6 +142,11 @@ extern "C" {
+++  */
+++ #define MAX_IOT_THING_NAME_LEN MAX_STREAM_NAME_LEN
+++ 
++++/**
++++ * Maximum allowed string length for ECS authorization token
++++ */
++++#define MAX_ECS_TOKEN_LEN 2048
++++
+++ /**
+++  * Maximum allowed request header length
+++  */
+++@@ -259,6 +269,7 @@ extern "C" {
+++  * HTTPS Protocol scheme name
+++  */
+++ #define HTTPS_SCHEME_NAME "https"
++++#define HTTP_SCHEME_NAME  "http"
+++ 
+++ /**
+++  * WSS Protocol scheme name
+++@@ -283,6 +294,11 @@ extern "C" {
+++  */
+++ #define SCHEMA_DELIMITER_STRING (PCHAR) "://"
+++ 
++++/**
++++ *  Port delimiter string
++++ */
++++#define PORT_DELIMITER_STRING ":"
++++
+++ /**
+++  * Default canonical URI if we fail to get anything from the parsing
+++  */
+++@@ -471,6 +487,7 @@ struct __RequestInfo {
+++                                               //!< NOTE: In streaming mode the body will be NULL
+++                                               //!< NOTE: The body will follow the main struct
+++     UINT32 bodySize;                          //!< Size of the body in bytes
++++    UINT32 port;                              //!< Port number of the request.
+++     CHAR url[MAX_URI_CHAR_LEN + 1];           //!< The URL for the request
+++     CHAR certPath[MAX_PATH_LEN + 1];          //!< CA Certificate path to use - optional
+++     CHAR sslCertPath[MAX_PATH_LEN + 1];       //!< SSL Certificate file path to use - optional
+++@@ -669,6 +686,41 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
+++  */
+++ PUBLIC_API STATUS freeIotCredentialProvider(PAwsCredentialProvider*);
+++ 
++++/**
++++ * @brief Creates an ECS based AWS credential provider object using libWebSockets
++++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/token-exchange-service-component.html
++++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/component-environment-variables.html
++++ *
++++ * @param[in] PCHAR Full uri of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_CREDENTIALS_FULL_URI)
++++ * @param[in] PCHAR Authorization token of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_AUTHORIZATION_TOKEN)
++++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
++++ *
++++ * @return STATUS code of the execution. STATUS_SUCCESS on success
++++ */
++++PUBLIC_API STATUS createLwsEcsCredentialProvider(PCHAR, PCHAR, PAwsCredentialProvider*);
++++
++++/**
++++ * @brief Creates an ECS based AWS credential provider object with time function which is based on libCurl
++++ *
++++ * @param[in] PCHAR Full uri of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_CREDENTIALS_FULL_URI)
++++ * @param[in] PCHAR Authorization token of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_AUTHORIZATION_TOKEN)
++++ * @param[in] GetCurrentTimeFunc Custom current time function
++++ * @param[in] UINT64 Time function custom data
++++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
++++ *
++++ * @return STATUS code of the execution. STATUS_SUCCESS on success
++++ */
++++PUBLIC_API STATUS createLwsEcsCredentialProviderWithTime(PCHAR, PCHAR, GetCurrentTimeFunc, UINT64, PAwsCredentialProvider*);
++++
++++/**
++++ * @brief Frees an ECS based Aws credential provider object
++++ *
++++ * @param[in,out] PAwsCredentialProvider* Object to be destroyed.
++++ *
++++ * @return STATUS code of the execution. STATUS_SUCCESS on success
++++ */
++++PUBLIC_API STATUS freeEcsCredentialProvider(PAwsCredentialProvider*);
++++
+++ /**
+++  * @brief Creates a File based AWS credential provider object
+++  *
+++@@ -720,7 +772,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
+++  *
+++  * @return STATUS code of the execution. STATUS_SUCCESS on success
+++  */
+++-PUBLIC_API STATUS createRequestInfo(PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, SSL_CERTIFICATE_TYPE, PCHAR, UINT64, UINT64, UINT64, UINT64,
++++PUBLIC_API STATUS createRequestInfo(PCHAR, PCHAR, UINT32, PCHAR, PCHAR, PCHAR, PCHAR, SSL_CERTIFICATE_TYPE, PCHAR, UINT64, UINT64, UINT64, UINT64,
+++                                     PAwsCredentials, PRequestInfo*);
+++ 
+++ /**
+++diff --git a/src/source/Common/EcsCredentialProvider.c b/src/source/Common/EcsCredentialProvider.c
+++new file mode 100644
+++index 0000000..7af931f
+++--- /dev/null
++++++ b/src/source/Common/EcsCredentialProvider.c
+++@@ -0,0 +1,293 @@
++++/**
++++ * Kinesis Video Producer ECS based Credential Provider
++++ */
++++#define LOG_CLASS "EcsCredentialProvider"
++++#include "Include_i.h"
++++
++++STATUS createEcsCredentialProviderWithTime(PCHAR ecsCredentialFullUri, PCHAR token, GetCurrentTimeFunc getCurrentTimeFn, UINT64 customData,
++++                                           BlockingServiceCallFunc serviceCallFn, PAwsCredentialProvider* ppCredentialProvider)
++++{
++++    ENTERS();
++++    STATUS retStatus = STATUS_SUCCESS;
++++    PEcsCredentialProvider pEcsCredentialProvider = NULL;
++++    PCHAR pStart, pEnd;
++++    UINT32 len;
++++    UINT32 port = 0;
++++    UINT32 fullUriLen = 0;
++++
++++    CHK(ppCredentialProvider != NULL && ecsCredentialFullUri != NULL && token != NULL && serviceCallFn != NULL, STATUS_NULL_ARG);
++++
++++    pEcsCredentialProvider = (PEcsCredentialProvider) MEMCALLOC(1, SIZEOF(EcsCredentialProvider));
++++    CHK(pEcsCredentialProvider != NULL, STATUS_NOT_ENOUGH_MEMORY);
++++
++++    pEcsCredentialProvider->credentialProvider.getCredentialsFn = getEcsCredentials;
++++
++++    // Store the time functionality and specify default if NULL
++++    pEcsCredentialProvider->getCurrentTimeFn = (getCurrentTimeFn == NULL) ? commonDefaultGetCurrentTimeFunc : getCurrentTimeFn;
++++    pEcsCredentialProvider->customData = customData;
++++
++++    fullUriLen = STRNLEN(ecsCredentialFullUri, MAX_URI_CHAR_LEN + 1);
++++
++++    CHK(fullUriLen <= MAX_URI_CHAR_LEN, STATUS_ECS_URI_LENGTH);
++++    CHK_STATUS(getRequestHost(ecsCredentialFullUri, &pStart, &pEnd));
++++    len = (UINT32) (pEnd - ecsCredentialFullUri);
++++    STRNCPY(pEcsCredentialProvider->ecsGetCredentialEndpoint, ecsCredentialFullUri, len);
++++    pEcsCredentialProvider->ecsGetCredentialEndpoint[len] = '\0';
++++
++++    CHK_STATUS(getHostPort(ecsCredentialFullUri + len, &pStart, &pEnd));
++++    CHK_STATUS(STRTOUI32(pStart, pEnd, 10, &port));
++++    pEcsCredentialProvider->port = port;
++++    len = (ecsCredentialFullUri + fullUriLen) - pEnd;
++++    STRNCPY(pEcsCredentialProvider->ecsGetCredentialResource, pEnd + 1, len);
++++
++++    CHK(STRNLEN(token, MAX_ECS_TOKEN_LEN + 1) <= MAX_ECS_TOKEN_LEN, STATUS_MAX_ECS_TOKEN_LENGTH);
++++    STRNCPY(pEcsCredentialProvider->token, token, MAX_ECS_TOKEN_LEN);
++++
++++    pEcsCredentialProvider->serviceCallFn = serviceCallFn;
++++
++++    CHK_STATUS(ecsCurlHandler(pEcsCredentialProvider));
++++
++++CleanUp:
++++
++++    if (STATUS_FAILED(retStatus)) {
++++        freeEcsCredentialProvider((PAwsCredentialProvider*) &pEcsCredentialProvider);
++++        pEcsCredentialProvider = NULL;
++++    }
++++
++++    // Set the return value if it's not NULL
++++    if (ppCredentialProvider != NULL) {
++++        *ppCredentialProvider = (PAwsCredentialProvider) pEcsCredentialProvider;
++++    }
++++
++++    LEAVES();
++++    return retStatus;
++++}
++++
++++STATUS freeEcsCredentialProvider(PAwsCredentialProvider* ppCredentialProvider)
++++{
++++    ENTERS();
++++    STATUS retStatus = STATUS_SUCCESS;
++++    PEcsCredentialProvider pEcsCredentialProvider = NULL;
++++
++++    CHK(ppCredentialProvider != NULL, STATUS_NULL_ARG);
++++
++++    pEcsCredentialProvider = (PEcsCredentialProvider) *ppCredentialProvider;
++++
++++    // Call is idempotent
++++    CHK(pEcsCredentialProvider != NULL, retStatus);
++++
++++    // Release the underlying AWS credentials object
++++    freeAwsCredentials(&pEcsCredentialProvider->pAwsCredentials);
++++
++++    // Release the object
++++    MEMFREE(pEcsCredentialProvider);
++++
++++    // Set the pointer to NULL
++++    *ppCredentialProvider = NULL;
++++
++++CleanUp:
++++
++++    LEAVES();
++++    return retStatus;
++++}
++++
++++STATUS getEcsCredentials(PAwsCredentialProvider pCredentialProvider, PAwsCredentials* ppAwsCredentials)
++++{
++++    ENTERS();
++++
++++    STATUS retStatus = STATUS_SUCCESS;
++++
++++    PEcsCredentialProvider pEcsCredentialProvider = (PEcsCredentialProvider) pCredentialProvider;
++++
++++    CHK(pEcsCredentialProvider != NULL && ppAwsCredentials != NULL, STATUS_NULL_ARG);
++++
++++    // Fill the credentials
++++    CHK_STATUS(ecsCurlHandler(pEcsCredentialProvider));
++++
++++    *ppAwsCredentials = pEcsCredentialProvider->pAwsCredentials;
++++
++++CleanUp:
++++
++++    LEAVES();
++++    return retStatus;
++++}
++++
++++STATUS parseEcsResponse(PEcsCredentialProvider pEcsCredentialProvider, PCallInfo pCallInfo)
++++{
++++    ENTERS();
++++    STATUS retStatus = STATUS_SUCCESS;
++++
++++    UINT32 i, resultLen, accessKeyIdLen = 0, secretKeyLen = 0, sessionTokenLen = 0, expirationTimestampLen = 0;
++++    INT32 tokenCount;
++++    jsmn_parser parser;
++++    jsmntok_t tokens[MAX_JSON_TOKEN_COUNT];
++++    PCHAR accessKeyId = NULL, secretKey = NULL, sessionToken = NULL, expirationTimestamp = NULL, pResponseStr = NULL;
++++    UINT64 expiration, currentTime;
++++    CHAR expirationTimestampStr[MAX_EXPIRATION_LEN + 1];
++++
++++    CHK(pEcsCredentialProvider != NULL && pCallInfo != NULL, STATUS_NULL_ARG);
++++
++++    resultLen = pCallInfo->responseDataLen;
++++    pResponseStr = pCallInfo->responseData;
++++    CHK(resultLen > 0, STATUS_ECS_AUTH_FAILED);
++++
++++    jsmn_init(&parser);
++++    tokenCount = jsmn_parse(&parser, pResponseStr, resultLen, tokens, SIZEOF(tokens) / SIZEOF(jsmntok_t));
++++
++++    CHK(tokenCount > 1, STATUS_INVALID_API_CALL_RETURN_JSON);
++++    CHK(tokens[0].type == JSMN_OBJECT, STATUS_INVALID_API_CALL_RETURN_JSON);
++++
++++    for (i = 1; i < (UINT32) tokenCount; i++) {
++++        if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "AccessKeyId")) {
++++            accessKeyIdLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
++++            CHK(accessKeyIdLen <= MAX_ACCESS_KEY_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
++++            accessKeyId = pResponseStr + tokens[i + 1].start;
++++            i++;
++++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "SecretAccessKey")) {
++++            secretKeyLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
++++            CHK(secretKeyLen <= MAX_SECRET_KEY_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
++++            secretKey = pResponseStr + tokens[i + 1].start;
++++            i++;
++++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "Token")) {
++++            sessionTokenLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
++++            CHK(sessionTokenLen <= MAX_SESSION_TOKEN_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
++++            sessionToken = pResponseStr + tokens[i + 1].start;
++++            i++;
++++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "Expiration")) {
++++            expirationTimestampLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
++++            CHK(expirationTimestampLen <= MAX_EXPIRATION_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
++++            expirationTimestamp = pResponseStr + tokens[i + 1].start;
++++            MEMCPY(expirationTimestampStr, expirationTimestamp, expirationTimestampLen);
++++            expirationTimestampStr[expirationTimestampLen] = '\0';
++++            i++;
++++        }
++++    }
++++
++++    CHK(accessKeyId != NULL && secretKey != NULL && sessionToken != NULL, STATUS_ECS_AUTH_RSP_FAILED);
++++
++++    currentTime = pEcsCredentialProvider->getCurrentTimeFn(pEcsCredentialProvider->customData);
++++    CHK_STATUS(convertTimestampToEpoch(expirationTimestampStr, currentTime / HUNDREDS_OF_NANOS_IN_A_SECOND, &expiration));
++++    DLOGD("Ecs credential expiration time %" PRIu64, expiration / HUNDREDS_OF_NANOS_IN_A_SECOND);
++++
++++    if (pEcsCredentialProvider->pAwsCredentials != NULL) {
++++        freeAwsCredentials(&pEcsCredentialProvider->pAwsCredentials);
++++        pEcsCredentialProvider->pAwsCredentials = NULL;
++++    }
++++
++++    // Fix-up the expiration to be no more than max enforced token rotation to avoid extra token rotations
++++    // as we are caching the returned value which is likely to be an hour but we are enforcing max
++++    // rotation to be more frequent.
++++    expiration = MIN(expiration, currentTime + MAX_ENFORCED_TOKEN_EXPIRATION_DURATION);
++++
++++    CHK_STATUS(createAwsCredentials(accessKeyId, accessKeyIdLen, secretKey, secretKeyLen, sessionToken, sessionTokenLen, expiration,
++++                                    &pEcsCredentialProvider->pAwsCredentials));
++++
++++CleanUp:
++++
++++    LEAVES();
++++    return retStatus;
++++}
++++
++++STATUS ecsCurlHandler(PEcsCredentialProvider pEcsCredentialProvider)
++++{
++++    ENTERS();
++++    STATUS retStatus = STATUS_SUCCESS;
++++    UINT64 currentTime;
++++    UINT32 formatLen = 0;
++++    CHAR serviceUrl[MAX_URI_CHAR_LEN + 1];
++++    PRequestInfo pRequestInfo = NULL;
++++    CallInfo callInfo;
++++
++++    MEMSET(&callInfo, 0x00, SIZEOF(CallInfo));
++++
++++    // Refresh the credentials
++++    currentTime = pEcsCredentialProvider->getCurrentTimeFn(pEcsCredentialProvider->customData);
++++
++++    CHK(pEcsCredentialProvider->pAwsCredentials == NULL ||
++++            currentTime + ECS_CREDENTIAL_FETCH_GRACE_PERIOD > pEcsCredentialProvider->pAwsCredentials->expiration,
++++        retStatus);
++++
++++    formatLen = SNPRINTF(serviceUrl, MAX_URI_CHAR_LEN, "%s/%s", pEcsCredentialProvider->ecsGetCredentialEndpoint,
++++                         pEcsCredentialProvider->ecsGetCredentialResource);
++++    CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_ECS_AUTH_URI_FAILED);
++++
++++    // Form a new request info based on the params
++++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, pEcsCredentialProvider->port, DEFAULT_AWS_REGION, NULL, NULL, NULL, SSL_CERTIFICATE_TYPE_PEM,
++++                                 DEFAULT_USER_AGENT_NAME, ECS_REQUEST_CONNECTION_TIMEOUT, ECS_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
++++                                 DEFAULT_LOW_SPEED_TIME_LIMIT, pEcsCredentialProvider->pAwsCredentials, &pRequestInfo));
++++
++++    callInfo.pRequestInfo = pRequestInfo;
++++
++++    // Append the Ecs header
++++    CHK_STATUS(setRequestHeader(pRequestInfo, ECS_AUTH_TOKEN_HEADER, 0, pEcsCredentialProvider->token, 0));
++++
++++    // Perform a blocking call
++++    CHK_STATUS(pEcsCredentialProvider->serviceCallFn(pRequestInfo, &callInfo));
++++
++++    // Parse the response and get the credentials
++++    CHK_STATUS(parseEcsResponse(pEcsCredentialProvider, &callInfo));
++++
++++CleanUp:
++++
++++    if (pRequestInfo != NULL) {
++++        freeRequestInfo(&pRequestInfo);
++++    }
++++
++++    releaseCallInfo(&callInfo);
++++
++++    return retStatus;
++++}
++++
++++STATUS getHostPort(PCHAR pUrl, PCHAR* ppStart, PCHAR* ppEnd)
++++{
++++    STATUS retStatus = STATUS_SUCCESS;
++++    PCHAR pStart = NULL, pEnd = NULL, pCurPtr;
++++    UINT32 urlLen;
++++    BOOL iterate = TRUE;
++++
++++    CHK(pUrl != NULL && ppStart != NULL && ppEnd != NULL, STATUS_NULL_ARG);
++++
++++    // We know for sure url is NULL terminated
++++    urlLen = (UINT32) STRNLEN(pUrl, MAX_URI_CHAR_LEN + 1);
++++
++++    // Start from the schema delimiter
++++    pStart = STRSTR(pUrl, PORT_DELIMITER_STRING);
++++    CHK(pStart != NULL, STATUS_INVALID_ARG);
++++
++++    // Advance the pStart past the delimiter
++++    pStart += (ARRAY_SIZE(PORT_DELIMITER_STRING) - 1);
++++
++++    // Ensure we are not past the string
++++    CHK(pUrl + urlLen > pStart, STATUS_INVALID_ARG);
++++
++++    // Set the end first
++++    pEnd = pUrl + urlLen;
++++
++++    // Find the delimiter which would indicate end of the host - either one of "/:?"
++++    pCurPtr = pStart;
++++    while (iterate && pCurPtr <= pEnd) {
++++        switch (*pCurPtr) {
++++            case '/':
++++            case ':':
++++            case '?':
++++                iterate = FALSE;
++++
++++                // Set the new end value
++++                pEnd = pCurPtr;
++++            default:
++++                pCurPtr++;
++++        }
++++    }
++++
++++CleanUp:
++++
++++    if (ppStart != NULL) {
++++        *ppStart = pStart;
++++    }
++++
++++    if (ppEnd != NULL) {
++++        *ppEnd = pEnd;
++++    }
++++
++++    return retStatus;
++++}
+++diff --git a/src/source/Common/EcsCredentialProvider.h b/src/source/Common/EcsCredentialProvider.h
+++new file mode 100644
+++index 0000000..c113af2
+++--- /dev/null
++++++ b/src/source/Common/EcsCredentialProvider.h
+++@@ -0,0 +1,64 @@
++++
++++#ifndef __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
++++#define __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
++++
++++#pragma once
++++
++++#ifdef __cplusplus
++++extern "C" {
++++#endif
++++
++++#define ECS_REQUEST_CONNECTION_TIMEOUT (3 * HUNDREDS_OF_NANOS_IN_A_SECOND)
++++#define ECS_REQUEST_COMPLETION_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
++++#define ECS_AUTH_TOKEN_HEADER          "authorization"
++++
++++/**
++++ * Service call callback functionality
++++ */
++++typedef STATUS (*BlockingServiceCallFunc)(PRequestInfo, PCallInfo);
++++
++++/**
++++ * Grace period which is added to the current time to determine whether the extracted credentials are still valid
++++ */
++++#define ECS_CREDENTIAL_FETCH_GRACE_PERIOD                                                                                                            \
++++    (5 * HUNDREDS_OF_NANOS_IN_A_SECOND + MIN_STREAMING_TOKEN_EXPIRATION_DURATION + STREAMING_TOKEN_EXPIRATION_GRACE_PERIOD)
++++
++++typedef struct __EcsCredentialProvider EcsCredentialProvider;
++++struct __EcsCredentialProvider {
++++    // First member should be the abstract credential provider
++++    AwsCredentialProvider credentialProvider;
++++
++++    // Current time functionality - optional
++++    GetCurrentTimeFunc getCurrentTimeFn;
++++
++++    // Custom data supplied to time function
++++    UINT64 customData;
++++
++++    // Ecs credential endpoint
++++    CHAR ecsGetCredentialEndpoint[MAX_URI_CHAR_LEN + 1];
++++    CHAR ecsGetCredentialResource[MAX_URI_CHAR_LEN + 1];
++++    CHAR token[MAX_ECS_TOKEN_LEN + 1];
++++    UINT32 port;
++++
++++    // Static Aws Credentials structure with the pointer following the main allocation
++++    PAwsCredentials pAwsCredentials;
++++
++++    // Service call functionality
++++    BlockingServiceCallFunc serviceCallFn;
++++};
++++typedef struct __EcsCredentialProvider* PEcsCredentialProvider;
++++
++++////////////////////////////////////////////////////////////////////////
++++// Callback function implementations
++++////////////////////////////////////////////////////////////////////////
++++STATUS createEcsCredentialProviderWithTime(PCHAR, PCHAR, GetCurrentTimeFunc, UINT64, BlockingServiceCallFunc, PAwsCredentialProvider*);
++++STATUS getEcsCredentials(PAwsCredentialProvider, PAwsCredentials*);
++++
++++// internal functions
++++STATUS ecsCurlHandler(PEcsCredentialProvider);
++++STATUS parseEcsResponse(PEcsCredentialProvider, PCallInfo);
++++STATUS getHostPort(PCHAR, PCHAR*, PCHAR*);
++++#ifdef __cplusplus
++++}
++++#endif
++++#endif /* __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
+++diff --git a/src/source/Common/Include_i.h b/src/source/Common/Include_i.h
+++index 56ae2ae..f931b57 100644
+++--- a/src/source/Common/Include_i.h
++++++ b/src/source/Common/Include_i.h
+++@@ -73,9 +73,11 @@ typedef struct __CRYPTO_dynlock_value* PCRYPTO_dynlock_value;
+++ #if defined(KVS_BUILD_WITH_LWS)
+++ #include "Lws/LwsCall.h"
+++ #include "Lws/LwsIotCredentialProvider.h"
++++#include "Lws/LwsEcsCredentialProvider.h"
+++ #endif
+++ 
+++ #include "IotCredentialProvider.h"
++++#include "EcsCredentialProvider.h"
+++ #include "AwsV4Signer.h"
+++ #include "Util.h"
+++ #include "RequestInfo.h"
+++diff --git a/src/source/Common/IotCredentialProvider.c b/src/source/Common/IotCredentialProvider.c
+++index a61218c..c95af1d 100644
+++--- a/src/source/Common/IotCredentialProvider.c
++++++ b/src/source/Common/IotCredentialProvider.c
+++@@ -214,7 +214,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
+++     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_FAILED);
+++ 
+++     // Form a new request info based on the params
+++-    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
++++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_SSL_PORT_NUMBER, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
+++                                  pIotCredentialProvider->privateKeyPath, SSL_CERTIFICATE_TYPE_PEM, DEFAULT_USER_AGENT_NAME,
+++                                  IOT_REQUEST_CONNECTION_TIMEOUT, IOT_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
+++                                  DEFAULT_LOW_SPEED_TIME_LIMIT, pIotCredentialProvider->pAwsCredentials, &pRequestInfo));
+++diff --git a/src/source/Common/Lws/LwsCall.c b/src/source/Common/Lws/LwsCall.c
+++index f06b588..cc069dd 100644
+++--- a/src/source/Common/Lws/LwsCall.c
++++++ b/src/source/Common/Lws/LwsCall.c
+++@@ -88,6 +88,90 @@ CleanUp:
+++     return retStatus;
+++ }
+++ 
++++STATUS blockingLwsHttpCall(PRequestInfo pRequestInfo, PCallInfo pCallInfo)
++++{
++++    ENTERS();
++++    STATUS retStatus = STATUS_SUCCESS;
++++    PCHAR pHostStart, pHostEnd;
++++    CHAR path[MAX_URI_CHAR_LEN + 1];
++++    struct lws_context* lwsContext = NULL;
++++    struct lws_context_creation_info creationInfo;
++++    struct lws_client_connect_info connectInfo;
++++    struct lws* clientLws = NULL;
++++    volatile INT32 retVal = 0;
++++    struct lws_protocols lwsProtocols[2];
++++
++++    CHK(pRequestInfo != NULL && pCallInfo != NULL, STATUS_NULL_ARG);
++++
++++    // Prepare the signaling channel protocols array
++++    MEMSET(lwsProtocols, 0x00, SIZEOF(lwsProtocols));
++++    lwsProtocols[0].name = HTTP_SCHEME_NAME;
++++    lwsProtocols[0].callback = lwsIotCallbackRoutine;
++++    lwsProtocols[1].name = NULL;
++++    lwsProtocols[1].callback = NULL;
++++
++++    // Prepare the LWS context
++++    MEMSET(&creationInfo, 0x00, SIZEOF(struct lws_context_creation_info));
++++    creationInfo.options = 0;
++++    creationInfo.port = CONTEXT_PORT_NO_LISTEN;
++++    creationInfo.protocols = lwsProtocols;
++++    creationInfo.timeout_secs = pRequestInfo->completionTimeout / HUNDREDS_OF_NANOS_IN_A_SECOND;
++++    creationInfo.gid = -1;
++++    creationInfo.uid = -1;
++++    creationInfo.fd_limit_per_thread = 1 + 1 + 1;
++++    creationInfo.client_ssl_ca_filepath = pRequestInfo->certPath;
++++    creationInfo.client_ssl_cert_filepath = pRequestInfo->sslCertPath;
++++    creationInfo.client_ssl_private_key_filepath = pRequestInfo->sslPrivateKeyPath;
++++
++++    CHK(NULL != (lwsContext = lws_create_context(&creationInfo)), STATUS_IOT_CREATE_LWS_CONTEXT_FAILED);
++++
++++    // Execute the LWS REST call
++++    MEMSET(&connectInfo, 0x00, SIZEOF(struct lws_client_connect_info));
++++    connectInfo.context = lwsContext;
++++    connectInfo.ssl_connection = LCCSCF_ALLOW_INSECURE;
++++    connectInfo.port = pRequestInfo->port;
++++
++++    CHK_STATUS(getRequestHost(pRequestInfo->url, &pHostStart, &pHostEnd));
++++
++++    // Store the path
++++    STRNCPY(path, pHostEnd, MAX_URI_CHAR_LEN);
++++    path[MAX_URI_CHAR_LEN] = '\0';
++++
++++    // NULL terminate the host
++++    *pHostEnd = '\0';
++++
++++    connectInfo.address = pHostStart;
++++    connectInfo.path = path;
++++    connectInfo.host = connectInfo.address;
++++    connectInfo.method = HTTP_REQUEST_VERB_GET_STRING;
++++    connectInfo.protocol = lwsProtocols[0].name;
++++    connectInfo.pwsi = &clientLws;
++++
++++    connectInfo.opaque_user_data = (PVOID) pCallInfo;
++++
++++    CHK(NULL != lws_client_connect_via_info(&connectInfo), STATUS_IOT_CREATE_LWS_CONTEXT_FAILED);
++++
++++    while (retVal >= 0 && !ATOMIC_LOAD_BOOL(&pCallInfo->pRequestInfo->terminating)) {
++++        retVal = lws_service(lwsContext, 0);
++++    }
++++
++++CleanUp:
++++
++++    if (lwsContext != NULL) {
++++        // Trigger termination
++++        ATOMIC_STORE_BOOL(&pCallInfo->pRequestInfo->terminating, TRUE);
++++
++++        // Cancel the ongoing service if any
++++        lws_cancel_service(lwsContext);
++++
++++        // Destroy the context
++++        lws_context_destroy(lwsContext);
++++    }
++++
++++    LEAVES();
++++    return retStatus;
++++}
++++
+++ INT32 lwsIotCallbackRoutine(struct lws* wsi, enum lws_callback_reasons reason, PVOID user, PVOID pDataIn, size_t dataSize)
+++ {
+++     UNUSED_PARAM(user);
+++@@ -259,4 +343,4 @@ CleanUp:
+++     } else {
+++         return retValue;
+++     }
+++-}
+++\ No newline at end of file
++++}
+++diff --git a/src/source/Common/Lws/LwsCall.h b/src/source/Common/Lws/LwsCall.h
+++index e334506..2601250 100644
+++--- a/src/source/Common/Lws/LwsCall.h
++++++ b/src/source/Common/Lws/LwsCall.h
+++@@ -12,6 +12,7 @@ extern "C" {
+++ #define IOT_LWS_SEND_BUFFER_SIZE (LWS_PRE + MAX_URI_CHAR_LEN)
+++ 
+++ STATUS blockingLwsCall(PRequestInfo, PCallInfo);
++++STATUS blockingLwsHttpCall(PRequestInfo, PCallInfo);
+++ INT32 lwsIotCallbackRoutine(struct lws*, enum lws_callback_reasons, PVOID, PVOID, size_t);
+++ 
+++ #ifdef __cplusplus
+++diff --git a/src/source/Common/Lws/LwsEcsCredentialProvider.c b/src/source/Common/Lws/LwsEcsCredentialProvider.c
+++new file mode 100644
+++index 0000000..94c26f5
+++--- /dev/null
++++++ b/src/source/Common/Lws/LwsEcsCredentialProvider.c
+++@@ -0,0 +1,16 @@
++++/**
++++ * Kinesis Video Producer ECS based Credential Provider for libWebSockets
++++ */
++++#define LOG_CLASS "LwsEcsCredentialProvider"
++++#include "../Include_i.h"
++++
++++STATUS createLwsEcsCredentialProvider(PCHAR ecsCredentialFullUri, PCHAR token, PAwsCredentialProvider* ppCredentialProvider)
++++{
++++    return createLwsEcsCredentialProviderWithTime(ecsCredentialFullUri, token, commonDefaultGetCurrentTimeFunc, 0, ppCredentialProvider);
++++}
++++
++++STATUS createLwsEcsCredentialProviderWithTime(PCHAR ecsCredentialFullUri, PCHAR token, GetCurrentTimeFunc getCurrentTimeFn, UINT64 customData,
++++                                              PAwsCredentialProvider* ppCredentialProvider)
++++{
++++    return createEcsCredentialProviderWithTime(ecsCredentialFullUri, token, getCurrentTimeFn, customData, blockingLwsHttpCall, ppCredentialProvider);
++++}
+++diff --git a/src/source/Common/Lws/LwsEcsCredentialProvider.h b/src/source/Common/Lws/LwsEcsCredentialProvider.h
+++new file mode 100644
+++index 0000000..93caa4c
+++--- /dev/null
++++++ b/src/source/Common/Lws/LwsEcsCredentialProvider.h
+++@@ -0,0 +1,16 @@
++++
++++#ifndef __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
++++#define __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
++++
++++#pragma once
++++
++++#ifdef __cplusplus
++++extern "C" {
++++#endif
++++
++++STATUS blockingLwsHttpCall(PRequestInfo, PCallInfo);
++++
++++#ifdef __cplusplus
++++}
++++#endif
++++#endif /* __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
+++diff --git a/src/source/Common/RequestInfo.c b/src/source/Common/RequestInfo.c
+++index adda706..f38e280 100644
+++--- a/src/source/Common/RequestInfo.c
++++++ b/src/source/Common/RequestInfo.c
+++@@ -1,7 +1,7 @@
+++ #define LOG_CLASS "RequestInfo"
+++ #include "Include_i.h"
+++ 
+++-STATUS createRequestInfo(PCHAR url, PCHAR body, PCHAR region, PCHAR certPath, PCHAR sslCertPath, PCHAR sslPrivateKeyPath,
++++STATUS createRequestInfo(PCHAR url, PCHAR body, UINT32 port, PCHAR region, PCHAR certPath, PCHAR sslCertPath, PCHAR sslPrivateKeyPath,
+++                          SSL_CERTIFICATE_TYPE certType, PCHAR userAgent, UINT64 connectionTimeout, UINT64 completionTimeout, UINT64 lowSpeedLimit,
+++                          UINT64 lowSpeedTimeLimit, PAwsCredentials pAwsCredentials, PRequestInfo* ppRequestInfo)
+++ {
+++@@ -28,6 +28,7 @@ STATUS createRequestInfo(PCHAR url, PCHAR body, PCHAR region, PCHAR certPath, PC
+++     pRequestInfo->connectionTimeout = connectionTimeout;
+++     ATOMIC_STORE_BOOL(&pRequestInfo->terminating, FALSE);
+++     pRequestInfo->bodySize = bodySize;
++++    pRequestInfo->port = port;
+++     pRequestInfo->currentTime = GETTIME();
+++     pRequestInfo->callAfter = pRequestInfo->currentTime;
+++     STRNCPY(pRequestInfo->region, region, MAX_REGION_NAME_LEN);
+++-- 
+++2.20.1 (Apple Git-117)
+++
++diff --git a/CMakeLists.txt b/CMakeLists.txt
++index 52b6fcecb..be5b26980 100644
++--- a/CMakeLists.txt
+++++ b/CMakeLists.txt
++@@ -276,13 +276,13 @@ include_directories(${OPEN_SRC_INSTALL_PREFIX}/include)
++ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
++ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
++ 
++-add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
++ 
+++add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
+++target_include_directories(kvsWebrtcClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
++ target_link_libraries(
++   kvsWebrtcClient
++   PRIVATE kvspicUtils
++           kvspicState
++-          ${CMAKE_THREAD_LIBS_INIT}
++           ${OPENSSL_SSL_LIBRARY}
++           ${OPENSSL_CRYPTO_LIBRARY}
++           ${SRTP_LIBRARIES}
++@@ -290,9 +290,11 @@ target_link_libraries(
++           ${MBEDTLS_LIBRARIES}
++           ${GPERFTOOLS_MALLOC_LIBRARIES}
++           ${GPERFTOOLS_PROFILER_LIBRARIES}
++-          ${EXTRA_DEPS})
+++          ${EXTRA_DEPS}
+++          ${CMAKE_THREAD_LIBS_INIT})
++ 
++ add_library(kvsWebrtcSignalingClient ${LINKAGE} ${WEBRTC_SIGNALING_CLIENT_SOURCE_FILES})
+++target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
++ 
++ target_link_libraries(
++   kvsWebrtcSignalingClient
++@@ -301,13 +303,13 @@ target_link_libraries(
++         ${LIBWEBSOCKETS_LIBRARIES} 
++   PRIVATE kvspicUtils
++          kvspicState
++-         ${CMAKE_THREAD_LIBS_INIT}
++          ${EXTRA_DEPS}
++          ${OPENSSL_SSL_LIBRARY}
++          ${OPENSSL_CRYPTO_LIBRARY}
++          ${GPERFTOOLS_MALLOC_LIBRARIES}
++          ${GPERFTOOLS_PROFILER_LIBRARIES}
++-         ${MBEDTLS_LIBRARIES})
+++         ${MBEDTLS_LIBRARIES}
+++         ${CMAKE_THREAD_LIBS_INIT})
++ 
++ if (WIN32)
++   target_link_libraries(kvsWebrtcClient PRIVATE "Ws2_32" "iphlpapi")
++diff --git a/samples/Common.c b/samples/Common.c
++index f1c9f961a..6b0181f0d 100644
++--- a/samples/Common.c
+++++ b/samples/Common.c
++@@ -1278,7 +1278,6 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
++                 // NULL the pointer to avoid it being freed in the cleanup
++                 pPendingMessageQueue = NULL;
++             }
++-
++             startStats = pSampleConfiguration->iceCandidatePairStatsTimerId == MAX_UINT32;
++             break;
++ 
++diff --git a/src/source/Signaling/LwsApiCalls.c b/src/source/Signaling/LwsApiCalls.c
++index 0298b5083..19c715d67 100644
++--- a/src/source/Signaling/LwsApiCalls.c
+++++ b/src/source/Signaling/LwsApiCalls.c
++@@ -663,10 +663,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++     SNPRINTF(paramsJson, ARRAY_SIZE(paramsJson), DESCRIBE_CHANNEL_PARAM_JSON_TEMPLATE, pSignalingClient->pChannelInfo->pChannelName);
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++ 
++     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
++ 
++@@ -808,10 +809,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++              pSignalingClient->pChannelInfo->messageTtl / HUNDREDS_OF_NANOS_IN_A_SECOND, tagsJson);
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++ 
++     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
++ 
++@@ -882,10 +884,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
++              SIGNALING_CHANNEL_PROTOCOL, getStringFromChannelRoleType(pSignalingClient->pChannelInfo->channelRoleType));
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++ 
++     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
++ 
++@@ -1013,10 +1016,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
++              pSignalingClient->clientInfo.signalingClientInfo.clientId);
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++ 
++     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
++ 
++@@ -1130,10 +1134,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++              pSignalingClient->channelDescription.updateVersion);
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++ 
++     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
++ 
++@@ -1239,10 +1244,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
++     }
++ 
++     // Create the request info with the body
++-    CHK_STATUS(createRequestInfo(url, NULL, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
++-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
++-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
++-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
+++    CHK_STATUS(createRequestInfo(url, NULL, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
+++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
+++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
+++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
+++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
++     // Override the POST with GET
++     pRequestInfo->verb = HTTP_REQUEST_VERB_GET;
++ 
++-- 
++2.17.1
++
+diff --git a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
+index 2420be89b..8db195b1a 100644
+--- a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
++++ b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
+@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 2.8)
+ 
+ project(libkvsCommonLws-download NONE)
+ 
++SET(PATCH_COMMAND "")
++
++if (NOT WIN32)
++    set(PATCH_COMMAND ${PATCH_COMMAND} git apply --ignore-whitespace ${CMAKE_CURRENT_LIST_DIR}/libkvsCommonLws-ecs-support.patch)
++endif()
++
+ include(ExternalProject)
+ 
+ ExternalProject_Add(libkvsCommonLws-download
+     GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
+-    GIT_TAG           d1095356712729d0489e56d1d0e27f5ce0a29fad
++    GIT_TAG           a8091d1a140fbdcb260ba3c8302aa2e4712d2d91
++    PATCH_COMMAND     ${PATCH_COMMAND}
+     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
+     CMAKE_ARGS        
+       -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
+diff --git a/CMake/Dependencies/libkvsCommonLws-ecs-support.patch b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
+new file mode 100644
+index 000000000..b3a39242f
+--- /dev/null
++++ b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
+@@ -0,0 +1,709 @@
++From 6725290bf69ff797aebeecf3f99ae9dba89283e8 Mon Sep 17 00:00:00 2001
++From: yc yang <ycyang@amazon.com>
++Date: Thu, 8 Jul 2021 22:17:24 +0800
++Subject: [PATCH] ecs-support-patch
++
++---
++ .../amazonaws/kinesis/video/common/Include.h  |  54 +++-
++ src/source/Common/EcsCredentialProvider.c     | 293 ++++++++++++++++++
++ src/source/Common/EcsCredentialProvider.h     |  64 ++++
++ src/source/Common/Include_i.h                 |   2 +
++ src/source/Common/IotCredentialProvider.c     |   2 +-
++ src/source/Common/Lws/LwsCall.c               |  86 ++++-
++ src/source/Common/Lws/LwsCall.h               |   1 +
++ .../Common/Lws/LwsEcsCredentialProvider.c     |  16 +
++ .../Common/Lws/LwsEcsCredentialProvider.h     |  16 +
++ src/source/Common/RequestInfo.c               |   3 +-
++ 10 files changed, 533 insertions(+), 4 deletions(-)
++ create mode 100644 src/source/Common/EcsCredentialProvider.c
++ create mode 100644 src/source/Common/EcsCredentialProvider.h
++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.c
++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.h
++
++diff --git a/src/include/com/amazonaws/kinesis/video/common/Include.h b/src/include/com/amazonaws/kinesis/video/common/Include.h
++index 17080ca..b34256e 100644
++--- a/src/include/com/amazonaws/kinesis/video/common/Include.h
+++++ b/src/include/com/amazonaws/kinesis/video/common/Include.h
++@@ -50,6 +50,11 @@ extern "C" {
++ #define STATUS_FILE_CREDENTIAL_PROVIDER_OPEN_FILE_FAILED    STATUS_COMMON_PRODUCER_BASE + 0x00000022
++ #define STATUS_FILE_CREDENTIAL_PROVIDER_INVALID_FILE_LENGTH STATUS_COMMON_PRODUCER_BASE + 0x00000023
++ #define STATUS_FILE_CREDENTIAL_PROVIDER_INVALID_FILE_FORMAT STATUS_COMMON_PRODUCER_BASE + 0x00000024
+++#define STATUS_ECS_AUTH_URI_FAILED                          STATUS_COMMON_PRODUCER_BASE + 0x00000025
+++#define STATUS_ECS_AUTH_FAILED                              STATUS_COMMON_PRODUCER_BASE + 0x00000026
+++#define STATUS_ECS_AUTH_RSP_FAILED                          STATUS_COMMON_PRODUCER_BASE + 0x00000027
+++#define STATUS_MAX_ECS_TOKEN_LENGTH                         STATUS_COMMON_PRODUCER_BASE + 0x00000028
+++#define STATUS_ECS_URI_LENGTH                               STATUS_COMMON_PRODUCER_BASE + 0x00000029
++ /*!@} */
++ 
++ /**
++@@ -137,6 +142,11 @@ extern "C" {
++  */
++ #define MAX_IOT_THING_NAME_LEN MAX_STREAM_NAME_LEN
++ 
+++/**
+++ * Maximum allowed string length for ECS authorization token
+++ */
+++#define MAX_ECS_TOKEN_LEN 2048
+++
++ /**
++  * Maximum allowed request header length
++  */
++@@ -259,6 +269,7 @@ extern "C" {
++  * HTTPS Protocol scheme name
++  */
++ #define HTTPS_SCHEME_NAME "https"
+++#define HTTP_SCHEME_NAME  "http"
++ 
++ /**
++  * WSS Protocol scheme name
++@@ -283,6 +294,11 @@ extern "C" {
++  */
++ #define SCHEMA_DELIMITER_STRING (PCHAR) "://"
++ 
+++/**
+++ *  Port delimiter string
+++ */
+++#define PORT_DELIMITER_STRING ":"
+++
++ /**
++  * Default canonical URI if we fail to get anything from the parsing
++  */
++@@ -471,6 +487,7 @@ struct __RequestInfo {
++                                               //!< NOTE: In streaming mode the body will be NULL
++                                               //!< NOTE: The body will follow the main struct
++     UINT32 bodySize;                          //!< Size of the body in bytes
+++    UINT32 port;                              //!< Port number of the request.
++     CHAR url[MAX_URI_CHAR_LEN + 1];           //!< The URL for the request
++     CHAR certPath[MAX_PATH_LEN + 1];          //!< CA Certificate path to use - optional
++     CHAR sslCertPath[MAX_PATH_LEN + 1];       //!< SSL Certificate file path to use - optional
++@@ -669,6 +686,41 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
++  */
++ PUBLIC_API STATUS freeIotCredentialProvider(PAwsCredentialProvider*);
++ 
+++/**
+++ * @brief Creates an ECS based AWS credential provider object using libWebSockets
+++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/token-exchange-service-component.html
+++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/component-environment-variables.html
+++ *
+++ * @param[in] PCHAR Full uri of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_CREDENTIALS_FULL_URI)
+++ * @param[in] PCHAR Authorization token of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_AUTHORIZATION_TOKEN)
+++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
+++ *
+++ * @return STATUS code of the execution. STATUS_SUCCESS on success
+++ */
+++PUBLIC_API STATUS createLwsEcsCredentialProvider(PCHAR, PCHAR, PAwsCredentialProvider*);
+++
+++/**
+++ * @brief Creates an ECS based AWS credential provider object with time function which is based on libCurl
+++ *
+++ * @param[in] PCHAR Full uri of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_CREDENTIALS_FULL_URI)
+++ * @param[in] PCHAR Authorization token of ECS credentials which is retrieved from the environment variable(AWS_CONTAINER_AUTHORIZATION_TOKEN)
+++ * @param[in] GetCurrentTimeFunc Custom current time function
+++ * @param[in] UINT64 Time function custom data
+++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
+++ *
+++ * @return STATUS code of the execution. STATUS_SUCCESS on success
+++ */
+++PUBLIC_API STATUS createLwsEcsCredentialProviderWithTime(PCHAR, PCHAR, GetCurrentTimeFunc, UINT64, PAwsCredentialProvider*);
+++
+++/**
+++ * @brief Frees an ECS based Aws credential provider object
+++ *
+++ * @param[in,out] PAwsCredentialProvider* Object to be destroyed.
+++ *
+++ * @return STATUS code of the execution. STATUS_SUCCESS on success
+++ */
+++PUBLIC_API STATUS freeEcsCredentialProvider(PAwsCredentialProvider*);
+++
++ /**
++  * @brief Creates a File based AWS credential provider object
++  *
++@@ -720,7 +772,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
++  *
++  * @return STATUS code of the execution. STATUS_SUCCESS on success
++  */
++-PUBLIC_API STATUS createRequestInfo(PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, PCHAR, SSL_CERTIFICATE_TYPE, PCHAR, UINT64, UINT64, UINT64, UINT64,
+++PUBLIC_API STATUS createRequestInfo(PCHAR, PCHAR, UINT32, PCHAR, PCHAR, PCHAR, PCHAR, SSL_CERTIFICATE_TYPE, PCHAR, UINT64, UINT64, UINT64, UINT64,
++                                     PAwsCredentials, PRequestInfo*);
++ 
++ /**
++diff --git a/src/source/Common/EcsCredentialProvider.c b/src/source/Common/EcsCredentialProvider.c
++new file mode 100644
++index 0000000..7af931f
++--- /dev/null
+++++ b/src/source/Common/EcsCredentialProvider.c
++@@ -0,0 +1,293 @@
+++/**
+++ * Kinesis Video Producer ECS based Credential Provider
+++ */
+++#define LOG_CLASS "EcsCredentialProvider"
+++#include "Include_i.h"
+++
+++STATUS createEcsCredentialProviderWithTime(PCHAR ecsCredentialFullUri, PCHAR token, GetCurrentTimeFunc getCurrentTimeFn, UINT64 customData,
+++                                           BlockingServiceCallFunc serviceCallFn, PAwsCredentialProvider* ppCredentialProvider)
+++{
+++    ENTERS();
+++    STATUS retStatus = STATUS_SUCCESS;
+++    PEcsCredentialProvider pEcsCredentialProvider = NULL;
+++    PCHAR pStart, pEnd;
+++    UINT32 len;
+++    UINT32 port = 0;
+++    UINT32 fullUriLen = 0;
+++
+++    CHK(ppCredentialProvider != NULL && ecsCredentialFullUri != NULL && token != NULL && serviceCallFn != NULL, STATUS_NULL_ARG);
+++
+++    pEcsCredentialProvider = (PEcsCredentialProvider) MEMCALLOC(1, SIZEOF(EcsCredentialProvider));
+++    CHK(pEcsCredentialProvider != NULL, STATUS_NOT_ENOUGH_MEMORY);
+++
+++    pEcsCredentialProvider->credentialProvider.getCredentialsFn = getEcsCredentials;
+++
+++    // Store the time functionality and specify default if NULL
+++    pEcsCredentialProvider->getCurrentTimeFn = (getCurrentTimeFn == NULL) ? commonDefaultGetCurrentTimeFunc : getCurrentTimeFn;
+++    pEcsCredentialProvider->customData = customData;
+++
+++    fullUriLen = STRNLEN(ecsCredentialFullUri, MAX_URI_CHAR_LEN + 1);
+++
+++    CHK(fullUriLen <= MAX_URI_CHAR_LEN, STATUS_ECS_URI_LENGTH);
+++    CHK_STATUS(getRequestHost(ecsCredentialFullUri, &pStart, &pEnd));
+++    len = (UINT32) (pEnd - ecsCredentialFullUri);
+++    STRNCPY(pEcsCredentialProvider->ecsGetCredentialEndpoint, ecsCredentialFullUri, len);
+++    pEcsCredentialProvider->ecsGetCredentialEndpoint[len] = '\0';
+++
+++    CHK_STATUS(getHostPort(ecsCredentialFullUri + len, &pStart, &pEnd));
+++    CHK_STATUS(STRTOUI32(pStart, pEnd, 10, &port));
+++    pEcsCredentialProvider->port = port;
+++    len = (ecsCredentialFullUri + fullUriLen) - pEnd;
+++    STRNCPY(pEcsCredentialProvider->ecsGetCredentialResource, pEnd + 1, len);
+++
+++    CHK(STRNLEN(token, MAX_ECS_TOKEN_LEN + 1) <= MAX_ECS_TOKEN_LEN, STATUS_MAX_ECS_TOKEN_LENGTH);
+++    STRNCPY(pEcsCredentialProvider->token, token, MAX_ECS_TOKEN_LEN);
+++
+++    pEcsCredentialProvider->serviceCallFn = serviceCallFn;
+++
+++    CHK_STATUS(ecsCurlHandler(pEcsCredentialProvider));
+++
+++CleanUp:
+++
+++    if (STATUS_FAILED(retStatus)) {
+++        freeEcsCredentialProvider((PAwsCredentialProvider*) &pEcsCredentialProvider);
+++        pEcsCredentialProvider = NULL;
+++    }
+++
+++    // Set the return value if it's not NULL
+++    if (ppCredentialProvider != NULL) {
+++        *ppCredentialProvider = (PAwsCredentialProvider) pEcsCredentialProvider;
+++    }
+++
+++    LEAVES();
+++    return retStatus;
+++}
+++
+++STATUS freeEcsCredentialProvider(PAwsCredentialProvider* ppCredentialProvider)
+++{
+++    ENTERS();
+++    STATUS retStatus = STATUS_SUCCESS;
+++    PEcsCredentialProvider pEcsCredentialProvider = NULL;
+++
+++    CHK(ppCredentialProvider != NULL, STATUS_NULL_ARG);
+++
+++    pEcsCredentialProvider = (PEcsCredentialProvider) *ppCredentialProvider;
+++
+++    // Call is idempotent
+++    CHK(pEcsCredentialProvider != NULL, retStatus);
+++
+++    // Release the underlying AWS credentials object
+++    freeAwsCredentials(&pEcsCredentialProvider->pAwsCredentials);
+++
+++    // Release the object
+++    MEMFREE(pEcsCredentialProvider);
+++
+++    // Set the pointer to NULL
+++    *ppCredentialProvider = NULL;
+++
+++CleanUp:
+++
+++    LEAVES();
+++    return retStatus;
+++}
+++
+++STATUS getEcsCredentials(PAwsCredentialProvider pCredentialProvider, PAwsCredentials* ppAwsCredentials)
+++{
+++    ENTERS();
+++
+++    STATUS retStatus = STATUS_SUCCESS;
+++
+++    PEcsCredentialProvider pEcsCredentialProvider = (PEcsCredentialProvider) pCredentialProvider;
+++
+++    CHK(pEcsCredentialProvider != NULL && ppAwsCredentials != NULL, STATUS_NULL_ARG);
+++
+++    // Fill the credentials
+++    CHK_STATUS(ecsCurlHandler(pEcsCredentialProvider));
+++
+++    *ppAwsCredentials = pEcsCredentialProvider->pAwsCredentials;
+++
+++CleanUp:
+++
+++    LEAVES();
+++    return retStatus;
+++}
+++
+++STATUS parseEcsResponse(PEcsCredentialProvider pEcsCredentialProvider, PCallInfo pCallInfo)
+++{
+++    ENTERS();
+++    STATUS retStatus = STATUS_SUCCESS;
+++
+++    UINT32 i, resultLen, accessKeyIdLen = 0, secretKeyLen = 0, sessionTokenLen = 0, expirationTimestampLen = 0;
+++    INT32 tokenCount;
+++    jsmn_parser parser;
+++    jsmntok_t tokens[MAX_JSON_TOKEN_COUNT];
+++    PCHAR accessKeyId = NULL, secretKey = NULL, sessionToken = NULL, expirationTimestamp = NULL, pResponseStr = NULL;
+++    UINT64 expiration, currentTime;
+++    CHAR expirationTimestampStr[MAX_EXPIRATION_LEN + 1];
+++
+++    CHK(pEcsCredentialProvider != NULL && pCallInfo != NULL, STATUS_NULL_ARG);
+++
+++    resultLen = pCallInfo->responseDataLen;
+++    pResponseStr = pCallInfo->responseData;
+++    CHK(resultLen > 0, STATUS_ECS_AUTH_FAILED);
+++
+++    jsmn_init(&parser);
+++    tokenCount = jsmn_parse(&parser, pResponseStr, resultLen, tokens, SIZEOF(tokens) / SIZEOF(jsmntok_t));
+++
+++    CHK(tokenCount > 1, STATUS_INVALID_API_CALL_RETURN_JSON);
+++    CHK(tokens[0].type == JSMN_OBJECT, STATUS_INVALID_API_CALL_RETURN_JSON);
+++
+++    for (i = 1; i < (UINT32) tokenCount; i++) {
+++        if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "AccessKeyId")) {
+++            accessKeyIdLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
+++            CHK(accessKeyIdLen <= MAX_ACCESS_KEY_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
+++            accessKeyId = pResponseStr + tokens[i + 1].start;
+++            i++;
+++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "SecretAccessKey")) {
+++            secretKeyLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
+++            CHK(secretKeyLen <= MAX_SECRET_KEY_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
+++            secretKey = pResponseStr + tokens[i + 1].start;
+++            i++;
+++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "Token")) {
+++            sessionTokenLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
+++            CHK(sessionTokenLen <= MAX_SESSION_TOKEN_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
+++            sessionToken = pResponseStr + tokens[i + 1].start;
+++            i++;
+++        } else if (compareJsonString(pResponseStr, &tokens[i], JSMN_STRING, (PCHAR) "Expiration")) {
+++            expirationTimestampLen = (UINT32) (tokens[i + 1].end - tokens[i + 1].start);
+++            CHK(expirationTimestampLen <= MAX_EXPIRATION_LEN, STATUS_INVALID_API_CALL_RETURN_JSON);
+++            expirationTimestamp = pResponseStr + tokens[i + 1].start;
+++            MEMCPY(expirationTimestampStr, expirationTimestamp, expirationTimestampLen);
+++            expirationTimestampStr[expirationTimestampLen] = '\0';
+++            i++;
+++        }
+++    }
+++
+++    CHK(accessKeyId != NULL && secretKey != NULL && sessionToken != NULL, STATUS_ECS_AUTH_RSP_FAILED);
+++
+++    currentTime = pEcsCredentialProvider->getCurrentTimeFn(pEcsCredentialProvider->customData);
+++    CHK_STATUS(convertTimestampToEpoch(expirationTimestampStr, currentTime / HUNDREDS_OF_NANOS_IN_A_SECOND, &expiration));
+++    DLOGD("Ecs credential expiration time %" PRIu64, expiration / HUNDREDS_OF_NANOS_IN_A_SECOND);
+++
+++    if (pEcsCredentialProvider->pAwsCredentials != NULL) {
+++        freeAwsCredentials(&pEcsCredentialProvider->pAwsCredentials);
+++        pEcsCredentialProvider->pAwsCredentials = NULL;
+++    }
+++
+++    // Fix-up the expiration to be no more than max enforced token rotation to avoid extra token rotations
+++    // as we are caching the returned value which is likely to be an hour but we are enforcing max
+++    // rotation to be more frequent.
+++    expiration = MIN(expiration, currentTime + MAX_ENFORCED_TOKEN_EXPIRATION_DURATION);
+++
+++    CHK_STATUS(createAwsCredentials(accessKeyId, accessKeyIdLen, secretKey, secretKeyLen, sessionToken, sessionTokenLen, expiration,
+++                                    &pEcsCredentialProvider->pAwsCredentials));
+++
+++CleanUp:
+++
+++    LEAVES();
+++    return retStatus;
+++}
+++
+++STATUS ecsCurlHandler(PEcsCredentialProvider pEcsCredentialProvider)
+++{
+++    ENTERS();
+++    STATUS retStatus = STATUS_SUCCESS;
+++    UINT64 currentTime;
+++    UINT32 formatLen = 0;
+++    CHAR serviceUrl[MAX_URI_CHAR_LEN + 1];
+++    PRequestInfo pRequestInfo = NULL;
+++    CallInfo callInfo;
+++
+++    MEMSET(&callInfo, 0x00, SIZEOF(CallInfo));
+++
+++    // Refresh the credentials
+++    currentTime = pEcsCredentialProvider->getCurrentTimeFn(pEcsCredentialProvider->customData);
+++
+++    CHK(pEcsCredentialProvider->pAwsCredentials == NULL ||
+++            currentTime + ECS_CREDENTIAL_FETCH_GRACE_PERIOD > pEcsCredentialProvider->pAwsCredentials->expiration,
+++        retStatus);
+++
+++    formatLen = SNPRINTF(serviceUrl, MAX_URI_CHAR_LEN, "%s/%s", pEcsCredentialProvider->ecsGetCredentialEndpoint,
+++                         pEcsCredentialProvider->ecsGetCredentialResource);
+++    CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_ECS_AUTH_URI_FAILED);
+++
+++    // Form a new request info based on the params
+++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, pEcsCredentialProvider->port, DEFAULT_AWS_REGION, NULL, NULL, NULL, SSL_CERTIFICATE_TYPE_PEM,
+++                                 DEFAULT_USER_AGENT_NAME, ECS_REQUEST_CONNECTION_TIMEOUT, ECS_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
+++                                 DEFAULT_LOW_SPEED_TIME_LIMIT, pEcsCredentialProvider->pAwsCredentials, &pRequestInfo));
+++
+++    callInfo.pRequestInfo = pRequestInfo;
+++
+++    // Append the Ecs header
+++    CHK_STATUS(setRequestHeader(pRequestInfo, ECS_AUTH_TOKEN_HEADER, 0, pEcsCredentialProvider->token, 0));
+++
+++    // Perform a blocking call
+++    CHK_STATUS(pEcsCredentialProvider->serviceCallFn(pRequestInfo, &callInfo));
+++
+++    // Parse the response and get the credentials
+++    CHK_STATUS(parseEcsResponse(pEcsCredentialProvider, &callInfo));
+++
+++CleanUp:
+++
+++    if (pRequestInfo != NULL) {
+++        freeRequestInfo(&pRequestInfo);
+++    }
+++
+++    releaseCallInfo(&callInfo);
+++
+++    return retStatus;
+++}
+++
+++STATUS getHostPort(PCHAR pUrl, PCHAR* ppStart, PCHAR* ppEnd)
+++{
+++    STATUS retStatus = STATUS_SUCCESS;
+++    PCHAR pStart = NULL, pEnd = NULL, pCurPtr;
+++    UINT32 urlLen;
+++    BOOL iterate = TRUE;
+++
+++    CHK(pUrl != NULL && ppStart != NULL && ppEnd != NULL, STATUS_NULL_ARG);
+++
+++    // We know for sure url is NULL terminated
+++    urlLen = (UINT32) STRNLEN(pUrl, MAX_URI_CHAR_LEN + 1);
+++
+++    // Start from the schema delimiter
+++    pStart = STRSTR(pUrl, PORT_DELIMITER_STRING);
+++    CHK(pStart != NULL, STATUS_INVALID_ARG);
+++
+++    // Advance the pStart past the delimiter
+++    pStart += (ARRAY_SIZE(PORT_DELIMITER_STRING) - 1);
+++
+++    // Ensure we are not past the string
+++    CHK(pUrl + urlLen > pStart, STATUS_INVALID_ARG);
+++
+++    // Set the end first
+++    pEnd = pUrl + urlLen;
+++
+++    // Find the delimiter which would indicate end of the host - either one of "/:?"
+++    pCurPtr = pStart;
+++    while (iterate && pCurPtr <= pEnd) {
+++        switch (*pCurPtr) {
+++            case '/':
+++            case ':':
+++            case '?':
+++                iterate = FALSE;
+++
+++                // Set the new end value
+++                pEnd = pCurPtr;
+++            default:
+++                pCurPtr++;
+++        }
+++    }
+++
+++CleanUp:
+++
+++    if (ppStart != NULL) {
+++        *ppStart = pStart;
+++    }
+++
+++    if (ppEnd != NULL) {
+++        *ppEnd = pEnd;
+++    }
+++
+++    return retStatus;
+++}
++diff --git a/src/source/Common/EcsCredentialProvider.h b/src/source/Common/EcsCredentialProvider.h
++new file mode 100644
++index 0000000..c113af2
++--- /dev/null
+++++ b/src/source/Common/EcsCredentialProvider.h
++@@ -0,0 +1,64 @@
+++
+++#ifndef __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
+++#define __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
+++
+++#pragma once
+++
+++#ifdef __cplusplus
+++extern "C" {
+++#endif
+++
+++#define ECS_REQUEST_CONNECTION_TIMEOUT (3 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+++#define ECS_REQUEST_COMPLETION_TIMEOUT (5 * HUNDREDS_OF_NANOS_IN_A_SECOND)
+++#define ECS_AUTH_TOKEN_HEADER          "authorization"
+++
+++/**
+++ * Service call callback functionality
+++ */
+++typedef STATUS (*BlockingServiceCallFunc)(PRequestInfo, PCallInfo);
+++
+++/**
+++ * Grace period which is added to the current time to determine whether the extracted credentials are still valid
+++ */
+++#define ECS_CREDENTIAL_FETCH_GRACE_PERIOD                                                                                                            \
+++    (5 * HUNDREDS_OF_NANOS_IN_A_SECOND + MIN_STREAMING_TOKEN_EXPIRATION_DURATION + STREAMING_TOKEN_EXPIRATION_GRACE_PERIOD)
+++
+++typedef struct __EcsCredentialProvider EcsCredentialProvider;
+++struct __EcsCredentialProvider {
+++    // First member should be the abstract credential provider
+++    AwsCredentialProvider credentialProvider;
+++
+++    // Current time functionality - optional
+++    GetCurrentTimeFunc getCurrentTimeFn;
+++
+++    // Custom data supplied to time function
+++    UINT64 customData;
+++
+++    // Ecs credential endpoint
+++    CHAR ecsGetCredentialEndpoint[MAX_URI_CHAR_LEN + 1];
+++    CHAR ecsGetCredentialResource[MAX_URI_CHAR_LEN + 1];
+++    CHAR token[MAX_ECS_TOKEN_LEN + 1];
+++    UINT32 port;
+++
+++    // Static Aws Credentials structure with the pointer following the main allocation
+++    PAwsCredentials pAwsCredentials;
+++
+++    // Service call functionality
+++    BlockingServiceCallFunc serviceCallFn;
+++};
+++typedef struct __EcsCredentialProvider* PEcsCredentialProvider;
+++
+++////////////////////////////////////////////////////////////////////////
+++// Callback function implementations
+++////////////////////////////////////////////////////////////////////////
+++STATUS createEcsCredentialProviderWithTime(PCHAR, PCHAR, GetCurrentTimeFunc, UINT64, BlockingServiceCallFunc, PAwsCredentialProvider*);
+++STATUS getEcsCredentials(PAwsCredentialProvider, PAwsCredentials*);
+++
+++// internal functions
+++STATUS ecsCurlHandler(PEcsCredentialProvider);
+++STATUS parseEcsResponse(PEcsCredentialProvider, PCallInfo);
+++STATUS getHostPort(PCHAR, PCHAR*, PCHAR*);
+++#ifdef __cplusplus
+++}
+++#endif
+++#endif /* __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
++diff --git a/src/source/Common/Include_i.h b/src/source/Common/Include_i.h
++index 56ae2ae..f931b57 100644
++--- a/src/source/Common/Include_i.h
+++++ b/src/source/Common/Include_i.h
++@@ -73,9 +73,11 @@ typedef struct __CRYPTO_dynlock_value* PCRYPTO_dynlock_value;
++ #if defined(KVS_BUILD_WITH_LWS)
++ #include "Lws/LwsCall.h"
++ #include "Lws/LwsIotCredentialProvider.h"
+++#include "Lws/LwsEcsCredentialProvider.h"
++ #endif
++ 
++ #include "IotCredentialProvider.h"
+++#include "EcsCredentialProvider.h"
++ #include "AwsV4Signer.h"
++ #include "Util.h"
++ #include "RequestInfo.h"
++diff --git a/src/source/Common/IotCredentialProvider.c b/src/source/Common/IotCredentialProvider.c
++index a61218c..c95af1d 100644
++--- a/src/source/Common/IotCredentialProvider.c
+++++ b/src/source/Common/IotCredentialProvider.c
++@@ -214,7 +214,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
++     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_FAILED);
++ 
++     // Form a new request info based on the params
++-    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
+++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_SSL_PORT_NUMBER, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
++                                  pIotCredentialProvider->privateKeyPath, SSL_CERTIFICATE_TYPE_PEM, DEFAULT_USER_AGENT_NAME,
++                                  IOT_REQUEST_CONNECTION_TIMEOUT, IOT_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
++                                  DEFAULT_LOW_SPEED_TIME_LIMIT, pIotCredentialProvider->pAwsCredentials, &pRequestInfo));
++diff --git a/src/source/Common/Lws/LwsCall.c b/src/source/Common/Lws/LwsCall.c
++index f06b588..cc069dd 100644
++--- a/src/source/Common/Lws/LwsCall.c
+++++ b/src/source/Common/Lws/LwsCall.c
++@@ -88,6 +88,90 @@ CleanUp:
++     return retStatus;
++ }
++ 
+++STATUS blockingLwsHttpCall(PRequestInfo pRequestInfo, PCallInfo pCallInfo)
+++{
+++    ENTERS();
+++    STATUS retStatus = STATUS_SUCCESS;
+++    PCHAR pHostStart, pHostEnd;
+++    CHAR path[MAX_URI_CHAR_LEN + 1];
+++    struct lws_context* lwsContext = NULL;
+++    struct lws_context_creation_info creationInfo;
+++    struct lws_client_connect_info connectInfo;
+++    struct lws* clientLws = NULL;
+++    volatile INT32 retVal = 0;
+++    struct lws_protocols lwsProtocols[2];
+++
+++    CHK(pRequestInfo != NULL && pCallInfo != NULL, STATUS_NULL_ARG);
+++
+++    // Prepare the signaling channel protocols array
+++    MEMSET(lwsProtocols, 0x00, SIZEOF(lwsProtocols));
+++    lwsProtocols[0].name = HTTP_SCHEME_NAME;
+++    lwsProtocols[0].callback = lwsIotCallbackRoutine;
+++    lwsProtocols[1].name = NULL;
+++    lwsProtocols[1].callback = NULL;
+++
+++    // Prepare the LWS context
+++    MEMSET(&creationInfo, 0x00, SIZEOF(struct lws_context_creation_info));
+++    creationInfo.options = 0;
+++    creationInfo.port = CONTEXT_PORT_NO_LISTEN;
+++    creationInfo.protocols = lwsProtocols;
+++    creationInfo.timeout_secs = pRequestInfo->completionTimeout / HUNDREDS_OF_NANOS_IN_A_SECOND;
+++    creationInfo.gid = -1;
+++    creationInfo.uid = -1;
+++    creationInfo.fd_limit_per_thread = 1 + 1 + 1;
+++    creationInfo.client_ssl_ca_filepath = pRequestInfo->certPath;
+++    creationInfo.client_ssl_cert_filepath = pRequestInfo->sslCertPath;
+++    creationInfo.client_ssl_private_key_filepath = pRequestInfo->sslPrivateKeyPath;
+++
+++    CHK(NULL != (lwsContext = lws_create_context(&creationInfo)), STATUS_IOT_CREATE_LWS_CONTEXT_FAILED);
+++
+++    // Execute the LWS REST call
+++    MEMSET(&connectInfo, 0x00, SIZEOF(struct lws_client_connect_info));
+++    connectInfo.context = lwsContext;
+++    connectInfo.ssl_connection = LCCSCF_ALLOW_INSECURE;
+++    connectInfo.port = pRequestInfo->port;
+++
+++    CHK_STATUS(getRequestHost(pRequestInfo->url, &pHostStart, &pHostEnd));
+++
+++    // Store the path
+++    STRNCPY(path, pHostEnd, MAX_URI_CHAR_LEN);
+++    path[MAX_URI_CHAR_LEN] = '\0';
+++
+++    // NULL terminate the host
+++    *pHostEnd = '\0';
+++
+++    connectInfo.address = pHostStart;
+++    connectInfo.path = path;
+++    connectInfo.host = connectInfo.address;
+++    connectInfo.method = HTTP_REQUEST_VERB_GET_STRING;
+++    connectInfo.protocol = lwsProtocols[0].name;
+++    connectInfo.pwsi = &clientLws;
+++
+++    connectInfo.opaque_user_data = (PVOID) pCallInfo;
+++
+++    CHK(NULL != lws_client_connect_via_info(&connectInfo), STATUS_IOT_CREATE_LWS_CONTEXT_FAILED);
+++
+++    while (retVal >= 0 && !ATOMIC_LOAD_BOOL(&pCallInfo->pRequestInfo->terminating)) {
+++        retVal = lws_service(lwsContext, 0);
+++    }
+++
+++CleanUp:
+++
+++    if (lwsContext != NULL) {
+++        // Trigger termination
+++        ATOMIC_STORE_BOOL(&pCallInfo->pRequestInfo->terminating, TRUE);
+++
+++        // Cancel the ongoing service if any
+++        lws_cancel_service(lwsContext);
+++
+++        // Destroy the context
+++        lws_context_destroy(lwsContext);
+++    }
+++
+++    LEAVES();
+++    return retStatus;
+++}
+++
++ INT32 lwsIotCallbackRoutine(struct lws* wsi, enum lws_callback_reasons reason, PVOID user, PVOID pDataIn, size_t dataSize)
++ {
++     UNUSED_PARAM(user);
++@@ -259,4 +343,4 @@ CleanUp:
++     } else {
++         return retValue;
++     }
++-}
++\ No newline at end of file
+++}
++diff --git a/src/source/Common/Lws/LwsCall.h b/src/source/Common/Lws/LwsCall.h
++index e334506..2601250 100644
++--- a/src/source/Common/Lws/LwsCall.h
+++++ b/src/source/Common/Lws/LwsCall.h
++@@ -12,6 +12,7 @@ extern "C" {
++ #define IOT_LWS_SEND_BUFFER_SIZE (LWS_PRE + MAX_URI_CHAR_LEN)
++ 
++ STATUS blockingLwsCall(PRequestInfo, PCallInfo);
+++STATUS blockingLwsHttpCall(PRequestInfo, PCallInfo);
++ INT32 lwsIotCallbackRoutine(struct lws*, enum lws_callback_reasons, PVOID, PVOID, size_t);
++ 
++ #ifdef __cplusplus
++diff --git a/src/source/Common/Lws/LwsEcsCredentialProvider.c b/src/source/Common/Lws/LwsEcsCredentialProvider.c
++new file mode 100644
++index 0000000..94c26f5
++--- /dev/null
+++++ b/src/source/Common/Lws/LwsEcsCredentialProvider.c
++@@ -0,0 +1,16 @@
+++/**
+++ * Kinesis Video Producer ECS based Credential Provider for libWebSockets
+++ */
+++#define LOG_CLASS "LwsEcsCredentialProvider"
+++#include "../Include_i.h"
+++
+++STATUS createLwsEcsCredentialProvider(PCHAR ecsCredentialFullUri, PCHAR token, PAwsCredentialProvider* ppCredentialProvider)
+++{
+++    return createLwsEcsCredentialProviderWithTime(ecsCredentialFullUri, token, commonDefaultGetCurrentTimeFunc, 0, ppCredentialProvider);
+++}
+++
+++STATUS createLwsEcsCredentialProviderWithTime(PCHAR ecsCredentialFullUri, PCHAR token, GetCurrentTimeFunc getCurrentTimeFn, UINT64 customData,
+++                                              PAwsCredentialProvider* ppCredentialProvider)
+++{
+++    return createEcsCredentialProviderWithTime(ecsCredentialFullUri, token, getCurrentTimeFn, customData, blockingLwsHttpCall, ppCredentialProvider);
+++}
++diff --git a/src/source/Common/Lws/LwsEcsCredentialProvider.h b/src/source/Common/Lws/LwsEcsCredentialProvider.h
++new file mode 100644
++index 0000000..93caa4c
++--- /dev/null
+++++ b/src/source/Common/Lws/LwsEcsCredentialProvider.h
++@@ -0,0 +1,16 @@
+++
+++#ifndef __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
+++#define __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__
+++
+++#pragma once
+++
+++#ifdef __cplusplus
+++extern "C" {
+++#endif
+++
+++STATUS blockingLwsHttpCall(PRequestInfo, PCallInfo);
+++
+++#ifdef __cplusplus
+++}
+++#endif
+++#endif /* __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
++diff --git a/src/source/Common/RequestInfo.c b/src/source/Common/RequestInfo.c
++index adda706..f38e280 100644
++--- a/src/source/Common/RequestInfo.c
+++++ b/src/source/Common/RequestInfo.c
++@@ -1,7 +1,7 @@
++ #define LOG_CLASS "RequestInfo"
++ #include "Include_i.h"
++ 
++-STATUS createRequestInfo(PCHAR url, PCHAR body, PCHAR region, PCHAR certPath, PCHAR sslCertPath, PCHAR sslPrivateKeyPath,
+++STATUS createRequestInfo(PCHAR url, PCHAR body, UINT32 port, PCHAR region, PCHAR certPath, PCHAR sslCertPath, PCHAR sslPrivateKeyPath,
++                          SSL_CERTIFICATE_TYPE certType, PCHAR userAgent, UINT64 connectionTimeout, UINT64 completionTimeout, UINT64 lowSpeedLimit,
++                          UINT64 lowSpeedTimeLimit, PAwsCredentials pAwsCredentials, PRequestInfo* ppRequestInfo)
++ {
++@@ -28,6 +28,7 @@ STATUS createRequestInfo(PCHAR url, PCHAR body, PCHAR region, PCHAR certPath, PC
++     pRequestInfo->connectionTimeout = connectionTimeout;
++     ATOMIC_STORE_BOOL(&pRequestInfo->terminating, FALSE);
++     pRequestInfo->bodySize = bodySize;
+++    pRequestInfo->port = port;
++     pRequestInfo->currentTime = GETTIME();
++     pRequestInfo->callAfter = pRequestInfo->currentTime;
++     STRNCPY(pRequestInfo->region, region, MAX_REGION_NAME_LEN);
++-- 
++2.20.1 (Apple Git-117)
++
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 52b6fcecb..be5b26980 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -276,13 +276,13 @@ include_directories(${OPEN_SRC_INSTALL_PREFIX}/include)
+ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
+ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
+ 
+-add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
+ 
++add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
++target_include_directories(kvsWebrtcClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
+ target_link_libraries(
+   kvsWebrtcClient
+   PRIVATE kvspicUtils
+           kvspicState
+-          ${CMAKE_THREAD_LIBS_INIT}
+           ${OPENSSL_SSL_LIBRARY}
+           ${OPENSSL_CRYPTO_LIBRARY}
+           ${SRTP_LIBRARIES}
+@@ -290,9 +290,11 @@ target_link_libraries(
+           ${MBEDTLS_LIBRARIES}
+           ${GPERFTOOLS_MALLOC_LIBRARIES}
+           ${GPERFTOOLS_PROFILER_LIBRARIES}
+-          ${EXTRA_DEPS})
++          ${EXTRA_DEPS}
++          ${CMAKE_THREAD_LIBS_INIT})
+ 
+ add_library(kvsWebrtcSignalingClient ${LINKAGE} ${WEBRTC_SIGNALING_CLIENT_SOURCE_FILES})
++target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
+ 
+ target_link_libraries(
+   kvsWebrtcSignalingClient
+@@ -301,13 +303,13 @@ target_link_libraries(
+         ${LIBWEBSOCKETS_LIBRARIES} 
+   PRIVATE kvspicUtils
+          kvspicState
+-         ${CMAKE_THREAD_LIBS_INIT}
+          ${EXTRA_DEPS}
+          ${OPENSSL_SSL_LIBRARY}
+          ${OPENSSL_CRYPTO_LIBRARY}
+          ${GPERFTOOLS_MALLOC_LIBRARIES}
+          ${GPERFTOOLS_PROFILER_LIBRARIES}
+-         ${MBEDTLS_LIBRARIES})
++         ${MBEDTLS_LIBRARIES}
++         ${CMAKE_THREAD_LIBS_INIT})
+ 
+ if (WIN32)
+   target_link_libraries(kvsWebrtcClient PRIVATE "Ws2_32" "iphlpapi")
+diff --git a/samples/Common.c b/samples/Common.c
+index f1c9f961a..6b0181f0d 100644
+--- a/samples/Common.c
++++ b/samples/Common.c
+@@ -1278,7 +1278,6 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
+                 // NULL the pointer to avoid it being freed in the cleanup
+                 pPendingMessageQueue = NULL;
+             }
+-
+             startStats = pSampleConfiguration->iceCandidatePairStatsTimerId == MAX_UINT32;
+             break;
+ 
+diff --git a/src/source/Signaling/LwsApiCalls.c b/src/source/Signaling/LwsApiCalls.c
+index 0298b5083..19c715d67 100644
+--- a/src/source/Signaling/LwsApiCalls.c
++++ b/src/source/Signaling/LwsApiCalls.c
+@@ -663,10 +663,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+     SNPRINTF(paramsJson, ARRAY_SIZE(paramsJson), DESCRIBE_CHANNEL_PARAM_JSON_TEMPLATE, pSignalingClient->pChannelInfo->pChannelName);
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+ 
+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
+ 
+@@ -808,10 +809,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+              pSignalingClient->pChannelInfo->messageTtl / HUNDREDS_OF_NANOS_IN_A_SECOND, tagsJson);
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+ 
+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
+ 
+@@ -882,10 +884,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
+              SIGNALING_CHANNEL_PROTOCOL, getStringFromChannelRoleType(pSignalingClient->pChannelInfo->channelRoleType));
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+ 
+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
+ 
+@@ -1013,10 +1016,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
+              pSignalingClient->clientInfo.signalingClientInfo.clientId);
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+ 
+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
+ 
+@@ -1130,10 +1134,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+              pSignalingClient->channelDescription.updateVersion);
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, paramsJson, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+ 
+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
+ 
+@@ -1239,10 +1244,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
+     }
+ 
+     // Create the request info with the body
+-    CHK_STATUS(createRequestInfo(url, NULL, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
+-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
+-                                 SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT, SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT,
+-                                 DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT, pSignalingClient->pAwsCredentials, &pRequestInfo));
++    CHK_STATUS(createRequestInfo(url, NULL, DEFAULT_SSL_PORT_NUMBER, pSignalingClient->pChannelInfo->pRegion,
++                                 pSignalingClient->pChannelInfo->pCertPath, NULL, NULL, SSL_CERTIFICATE_TYPE_NOT_SPECIFIED,
++                                 pSignalingClient->pChannelInfo->pUserAgent, SIGNALING_SERVICE_API_CALL_CONNECTION_TIMEOUT,
++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
+     // Override the POST with GET
+     pRequestInfo->verb = HTTP_REQUEST_VERB_GET;
+ 
+-- 
+2.17.1
+

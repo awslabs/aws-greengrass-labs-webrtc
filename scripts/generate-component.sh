@@ -16,13 +16,13 @@ if [ $# -ne 6 ]; then
   exit 1
 fi
 # information of this component
-# com.aws-sample.webrtc
+# aws.greengrass.labs.webrtc
 ComponentName=$1
 # 1.0.0
 ComponentVersion=$2
-# "greengrass-webrtc-bucket"
+# "aws-greengrass-labs-webrtc-bucket"
 ComponentArtifactsBucket=$3
-# "GreengrassV2ComponentWebRTCSecretTstv2"
+# "aws-greengrass-labs-webrtc-secret"
 SecretName=$4
 Os=$5
 Architecture=$6
@@ -52,7 +52,7 @@ cat > components/recipes/$ComponentName-$ComponentVersion.json<<EOF
   "RecipeFormatVersion": "2020-01-25",
   "ComponentName": "$ComponentName",
   "ComponentVersion": "$ComponentVersion",
-  "ComponentDescription": "The greengrass v2 webrtc app.",
+  "ComponentDescription": "The WebRTC GreenGrass Component.",
   "ComponentPublisher": "Amazon",
   "ComponentDependencies": {
     "aws.greengrass.TokenExchangeService": {
@@ -106,7 +106,7 @@ cat > components/recipes/$ComponentName-$ComponentVersion.json<<EOF
           }
         },
         {
-          "URI": "s3://$ComponentArtifactsBucket/artifacts/$ComponentName/$ComponentVersion/kvsWebrtcClientMasterGstRtspSample",
+          "URI": "s3://$ComponentArtifactsBucket/artifacts/$ComponentName/$ComponentVersion/awsGreengrassLabsWebRTC",
           "Permission": {
             "Read": "OWNER",
             "Execute" : "OWNER"

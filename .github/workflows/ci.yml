@@ -1,0 +1,47 @@
+name: CI Checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone This Repo
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
+          sudo apt-get install -y libssl-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base-apps gstreamer1.0-plugins-bad gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly gstreamer1.0-tools
+          git submodule update --init
+          git submodule update --checkout --init --recursive source/test/unit-test/CMock
+          cd source/amazon-kinesis-video-streams-webrtc-sdk-c
+          git apply --ignore-whitespace ../patches/0001-ecs-support.patch
+          cd ..
+          mkdir build && cd build && cmake ..
+          make -j all
+          cd ..
+          rm -rf build
+          cmake -S test -B build/ \
+          -G "Unix Makefiles" \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_CLONE_SUBMODULES=ON \
+          -DCMAKE_C_FLAGS='--coverage -Wall -Wextra -DNDEBUG -DLIBRARY_LOG_LEVEL=LOG_DEBUG'
+          make -C build/ all
+      - name: Test
+        run: |
+          cd source/build
+          ctest -E system --output-on-failure
+          cd ..
+      - name: Run Coverage
+        run: |
+          cd source
+          make -C build/ coverage
+          declare -a EXCLUDE=("\*test\*" "\*CMakeCCompilerId\*" "\*mocks\*")
+          echo ${EXCLUDE[@]} | xargs lcov --rc lcov_branch_coverage=1 -r build/coverage.info -o build/coverage.info
+          lcov --rc lcov_branch_coverage=1 --list ./build/coverage.info

@@ -2,7 +2,7 @@
   "RecipeFormatVersion": "2020-01-25",
   "ComponentName": "USER_SETTING",
   "ComponentVersion": "USER_SETTING",
-  "ComponentDescription": "The greengrass v2 webrtc app.",
+  "ComponentDescription": "The WebRTC GreenGrass Component.",
   "ComponentPublisher": "Amazon",
   "ComponentDependencies": {
     "aws.greengrass.TokenExchangeService": {
@@ -56,7 +56,7 @@
           }
         },
         {
-          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/kvsWebrtcClientMasterGstRtspSample",
+          "URI": "s3://USER_SETTING/artifacts/USER_SETTING/USER_SETTING/awsGreengrassLabsWebRTC",
           "Permission": {
             "Read": "OWNER",
             "Execute" : "OWNER"

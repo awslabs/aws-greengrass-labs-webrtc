@@ -97,13 +97,13 @@ for rtsp_cam_config in secret_json['RtspConfig']:
     print("RtspUrl:" + rtsp_cam_config['RtspUrl'] + " with " + rtsp_cam_config['ChannelName'], file=sys.stdout)
     shell_env["AWS_KVS_CACERT_PATH"] = exec_path+"/AmazonRootCA1.pem"
     shell_env["AWS_KVS_LOG_LEVEL"] = setting_json['AwsKvsLogLevel']
-    shell_env["AWS_RTSP_CHANNEL"] = rtsp_cam_config['ChannelName']
-    shell_env["AWS_RTSP_URI"] = rtsp_cam_config['RtspUrl']
+    shell_env["AWS_WEBRTC_CHANNEL"] = rtsp_cam_config['ChannelName']
+    shell_env["AWS_RTSP_URL"] = rtsp_cam_config['RtspUrl']
     if 'username' in rtsp_cam_config:
         shell_env["AWS_RTSP_USERNAME"] = rtsp_cam_config['username']
     if 'password' in rtsp_cam_config:
         shell_env["AWS_RTSP_PASSWORD"] = rtsp_cam_config['password']
-    thread = subprocess.Popen(exec_path+"/kvsWebrtcClientMasterGstRtspSample", env=shell_env, encoding="utf-8")
+    thread = subprocess.Popen(exec_path+"/awsGreengrassLabsWebRTC", env=shell_env, encoding="utf-8")
     thread_list.append(thread)
 
 for thread in thread_list:

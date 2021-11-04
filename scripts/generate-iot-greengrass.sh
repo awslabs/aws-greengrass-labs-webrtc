@@ -21,14 +21,14 @@ AwsProfile=$1
 # e.g. MyGreengrassCore
 IotThingName=$2
 # information of this component
-# e.g. com.aws-sample.webrtc
+# e.g. aws.greengrass.labs.webrtc
 ComponentName=$3
 # e.g. 1.0.0
 ComponentVersion=$4
-# e.g. greengrass-webrtc-bucket
+# e.g. aws-greengrass-labs-webrtc-bucket
 ComponentArtifactsBucket=$5
 # secret manager related
-# e.g. GreengrassV2ComponentWebRTCSecret
+# e.g. aws-greengrass-labs-webrtc-secret
 SecretName=$6
 # e.g. rtsp-camera-configuration.json
 SecretFileName=$7
