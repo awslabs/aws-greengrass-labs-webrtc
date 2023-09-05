@@ -46,7 +46,7 @@ STATUS queryAppSignalingServer(PAppSignaling pAppSignaling, PRtcIceServer pIceSe
     *pServerNum = 0;
 
     // Set the  STUN server
-    SNPRINTF(pIceServer[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pAppSignaling->channelInfo.pRegion);
+    SNPRINTF(pIceServer[0].urls, MAX_ICE_CONFIG_URI_LEN, KINESIS_VIDEO_STUN_URL, pAppSignaling->channelInfo.pRegion, KINESIS_VIDEO_STUN_URL_POSTFIX);
     *pServerNum = 1;
 
     if (pAppSignaling->useTurn) {
@@ -93,6 +93,7 @@ STATUS connectAppSignaling(PAppSignaling pAppSignaling)
         STATUS_APP_SIGNALING_CREATE);
     DLOGD("Signaling client created successfully\n");
     // Enable the processing of the messages
+    CHK_STATUS(signalingClientFetchSync(pAppSignaling->signalingClientHandle));
     CHK(signalingClientConnectSync(pAppSignaling->signalingClientHandle) == STATUS_SUCCESS, STATUS_APP_SIGNALING_CONNECT);
 
 CleanUp:

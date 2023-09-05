@@ -216,10 +216,12 @@ void test_connectAppSignaling(void)
     TEST_ASSERT_EQUAL(STATUS_APP_SIGNALING_CREATE, retStatus);
 
     createSignalingClientSync_IgnoreAndReturn(STATUS_SUCCESS);
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_APP_SIGNALING_CONNECT);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_APP_SIGNALING_CONNECT, retStatus);
 
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_SUCCESS);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
@@ -241,6 +243,7 @@ void test_checkAppSignaling(void)
     TEST_ASSERT_EQUAL(STATUS_APP_SIGNALING_INVALID_HANDLE, retStatus);
 
     createSignalingClientSync_StubWithCallback(createSignalingClientSync_callback);
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_SUCCESS);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
@@ -290,6 +293,7 @@ void test_sendAppSignalingMessage(void)
     TEST_ASSERT_EQUAL(STATUS_APP_SIGNALING_INVALID_HANDLE, retStatus);
 
     createSignalingClientSync_StubWithCallback(createSignalingClientSync_callback);
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_SUCCESS);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
@@ -344,6 +348,7 @@ void test_freeAppSignaling(void)
     retStatus = initAppSignaling(pAppSignaling, NULL, NULL, NULL, NULL, TRUE);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
     createSignalingClientSync_StubWithCallback(createSignalingClientSync_callback);
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_SUCCESS);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
@@ -355,6 +360,7 @@ void test_freeAppSignaling(void)
     retStatus = initAppSignaling(pAppSignaling, NULL, NULL, NULL, NULL, TRUE);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);
     createSignalingClientSync_StubWithCallback(createSignalingClientSync_callback);
+    signalingClientFetchSync_IgnoreAndReturn(STATUS_SUCCESS);
     signalingClientConnectSync_IgnoreAndReturn(STATUS_SUCCESS);
     retStatus = connectAppSignaling(pAppSignaling);
     TEST_ASSERT_EQUAL(STATUS_SUCCESS, retStatus);

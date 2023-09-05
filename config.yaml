@@ -7,7 +7,7 @@ system:
 services:
   aws.greengrass.Nucleus:
     componentType: "NUCLEUS"
-    version: "2.3.0"
+    version: "2.11.2"
     configuration:
       awsRegion: "USER_SETTING"
       iotCredEndpoint: "USER_SETTING"

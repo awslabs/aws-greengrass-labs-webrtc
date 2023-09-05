@@ -45,7 +45,7 @@ cat > $TempPath/$DeploymentName.json<<EOF
     "deploymentName": "Deployment for MyGreengrassCore",
     "components": {
         "aws.greengrass.SecretManager":{
-            "componentVersion": "2.0.8",
+            "componentVersion": "2.1.6",
             "configurationUpdate": {
                 "reset": [],
                 "merge": "{\"cloudSecrets\":[{\"arn\": \"$SecretTargetArn\"}]}"

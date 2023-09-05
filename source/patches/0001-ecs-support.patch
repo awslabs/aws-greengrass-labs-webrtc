@@ -1,44 +1,50 @@
-From 6bef16923378a6944ba519aae8fdb84292f191b0 Mon Sep 17 00:00:00 2001
-From: ycyang1229 <yc.yang1229@gmail.com>
-Date: Thu, 23 Sep 2021 17:14:23 +0800
+From 850d2fe10afd3340cbb8116ae68e2d480abc88c6 Mon Sep 17 00:00:00 2001
+From: caihy0414 <caihy0414@thundersoft.com>
+Date: Fri, 8 Sep 2023 17:23:23 +0800
 Subject: [PATCH] ecs-support
 
 ---
- 0001-ecs-support.patch.patch                  | 917 ++++++++++++++++++
- .../libkvsCommonLws-CMakeLists.txt            |   9 +-
- .../libkvsCommonLws-ecs-support.patch         | 709 ++++++++++++++
+ 0001-ecs-support.patch.patch                  | 916 ++++++++++++++++++
+ .../libkvsCommonLws-CMakeLists.txt            |   7 +
+ .../libkvsCommonLws-ecs-support.patch         | 710 ++++++++++++++
  CMakeLists.txt                                |  12 +-
- samples/Common.c                              |   1 -
  src/source/Signaling/LwsApiCalls.c            |  54 +-
- 6 files changed, 1671 insertions(+), 31 deletions(-)
+ 5 files changed, 1671 insertions(+), 28 deletions(-)
  create mode 100644 0001-ecs-support.patch.patch
- create mode 100644 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
+ mode change 100644 => 100755 CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
+ create mode 100755 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
+ mode change 100644 => 100755 CMakeLists.txt
+ mode change 100644 => 100755 src/source/Signaling/LwsApiCalls.c
 
 diff --git a/0001-ecs-support.patch.patch b/0001-ecs-support.patch.patch
 new file mode 100644
-index 000000000..7d662ccad
+index 000000000..08180dbbb
 --- /dev/null
 +++ b/0001-ecs-support.patch.patch
-@@ -0,0 +1,917 @@
-+From 4ddd26bc50a2344bc23ef355508e0e12b895e872 Mon Sep 17 00:00:00 2001
-+From: ycyang1229 <yc.yang1229@gmail.com>
-+Date: Thu, 23 Sep 2021 17:13:04 +0800
+@@ -0,0 +1,916 @@
++From 43cfd235a79cb037b319a62ad4b1743c4f708263 Mon Sep 17 00:00:00 2001
++From: caihy0414 <caihy0414@thundersoft.com>
++Date: Fri, 8 Sep 2023 17:23:23 +0800
 +Subject: [PATCH] ecs-support.patch
 +
 +---
-+ .../libkvsCommonLws-CMakeLists.txt            |   9 +-
-+ .../libkvsCommonLws-ecs-support.patch         | 709 ++++++++++++++++++
++ .../libkvsCommonLws-CMakeLists.txt            |   7 +
++ .../libkvsCommonLws-ecs-support.patch         | 710 ++++++++++++++++++
 + CMakeLists.txt                                |  12 +-
-+ samples/Common.c                              |   1 -
 + src/source/Signaling/LwsApiCalls.c            |  54 +-
-+ 5 files changed, 754 insertions(+), 31 deletions(-)
-+ create mode 100644 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
++ 4 files changed, 755 insertions(+), 28 deletions(-)
++ mode change 100644 => 100755 CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
++ create mode 100755 CMake/Dependencies/libkvsCommonLws-ecs-support.patch
++ mode change 100644 => 100755 CMakeLists.txt
++ mode change 100644 => 100755 src/source/Signaling/LwsApiCalls.c
 +
 +diff --git a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
-+index 2420be89b..8db195b1a 100644
++old mode 100644
++new mode 100755
++index 08ae3908d..de0b96fd2
 +--- a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
 ++++ b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
-+@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 2.8)
++@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 3.6.3)
 + 
 + project(libkvsCommonLws-download NONE)
 + 
@@ -52,42 +58,41 @@ index 000000000..7d662ccad
 + 
 + ExternalProject_Add(libkvsCommonLws-download
 +     GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
-+-    GIT_TAG           d1095356712729d0489e56d1d0e27f5ce0a29fad
-++    GIT_TAG           a8091d1a140fbdcb260ba3c8302aa2e4712d2d91
++     GIT_TAG           178109a5dbfc5288ba5cf7fab1dc1afd5e2e182b
 ++    PATCH_COMMAND     ${PATCH_COMMAND}
 +     PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
 +     CMAKE_ARGS        
 +       -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
 +diff --git a/CMake/Dependencies/libkvsCommonLws-ecs-support.patch b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
-+new file mode 100644
-+index 000000000..b3a39242f
++new file mode 100755
++index 000000000..6038a0bf8
 +--- /dev/null
 ++++ b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
-+@@ -0,0 +1,709 @@
-++From 6725290bf69ff797aebeecf3f99ae9dba89283e8 Mon Sep 17 00:00:00 2001
-++From: yc yang <ycyang@amazon.com>
-++Date: Thu, 8 Jul 2021 22:17:24 +0800
++@@ -0,0 +1,710 @@
+++From 71f5f21bdd7de8f3aa75a265d090a343f1a40795 Mon Sep 17 00:00:00 2001
+++From: Ubuntu <ubuntu@ip-172-31-27-105.ec2.internal>
+++Date: Tue, 5 Sep 2023 07:57:27 +0000
 ++Subject: [PATCH] ecs-support-patch
 ++
 ++---
-++ .../amazonaws/kinesis/video/common/Include.h  |  54 +++-
+++ .../amazonaws/kinesis/video/common/Include.h  |  55 +++-
 ++ src/source/Common/EcsCredentialProvider.c     | 293 ++++++++++++++++++
 ++ src/source/Common/EcsCredentialProvider.h     |  64 ++++
 ++ src/source/Common/Include_i.h                 |   2 +
 ++ src/source/Common/IotCredentialProvider.c     |   2 +-
-++ src/source/Common/Lws/LwsCall.c               |  86 ++++-
+++ src/source/Common/Lws/LwsCall.c               |  84 +++++
 ++ src/source/Common/Lws/LwsCall.h               |   1 +
 ++ .../Common/Lws/LwsEcsCredentialProvider.c     |  16 +
 ++ .../Common/Lws/LwsEcsCredentialProvider.h     |  16 +
-++ src/source/Common/RequestInfo.c               |   3 +-
-++ 10 files changed, 533 insertions(+), 4 deletions(-)
+++ src/source/Common/RequestInfo.c               |   5 +-
+++ 10 files changed, 534 insertions(+), 4 deletions(-)
 ++ create mode 100644 src/source/Common/EcsCredentialProvider.c
 ++ create mode 100644 src/source/Common/EcsCredentialProvider.h
 ++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.c
 ++ create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.h
 ++
 ++diff --git a/src/include/com/amazonaws/kinesis/video/common/Include.h b/src/include/com/amazonaws/kinesis/video/common/Include.h
-++index 17080ca..b34256e 100644
+++index 730b0b2..dd63ed3 100644
 ++--- a/src/include/com/amazonaws/kinesis/video/common/Include.h
 +++++ b/src/include/com/amazonaws/kinesis/video/common/Include.h
 ++@@ -50,6 +50,11 @@ extern "C" {
@@ -101,8 +106,8 @@ index 000000000..7d662ccad
 +++#define STATUS_ECS_URI_LENGTH                               STATUS_COMMON_PRODUCER_BASE + 0x00000029
 ++ /*!@} */
 ++ 
-++ /**
-++@@ -137,6 +142,11 @@ extern "C" {
+++ ////////////////////////////////////////////////////
+++@@ -143,6 +148,11 @@ extern "C" {
 ++  */
 ++ #define MAX_IOT_THING_NAME_LEN MAX_STREAM_NAME_LEN
 ++ 
@@ -114,7 +119,7 @@ index 000000000..7d662ccad
 ++ /**
 ++  * Maximum allowed request header length
 ++  */
-++@@ -259,6 +269,7 @@ extern "C" {
+++@@ -270,6 +280,7 @@ extern "C" {
 ++  * HTTPS Protocol scheme name
 ++  */
 ++ #define HTTPS_SCHEME_NAME "https"
@@ -122,7 +127,7 @@ index 000000000..7d662ccad
 ++ 
 ++ /**
 ++  * WSS Protocol scheme name
-++@@ -283,6 +294,11 @@ extern "C" {
+++@@ -294,6 +305,11 @@ extern "C" {
 ++  */
 ++ #define SCHEMA_DELIMITER_STRING (PCHAR) "://"
 ++ 
@@ -134,7 +139,7 @@ index 000000000..7d662ccad
 ++ /**
 ++  * Default canonical URI if we fail to get anything from the parsing
 ++  */
-++@@ -471,6 +487,7 @@ struct __RequestInfo {
+++@@ -482,6 +498,7 @@ struct __RequestInfo {
 ++                                               //!< NOTE: In streaming mode the body will be NULL
 ++                                               //!< NOTE: The body will follow the main struct
 ++     UINT32 bodySize;                          //!< Size of the body in bytes
@@ -142,10 +147,11 @@ index 000000000..7d662ccad
 ++     CHAR url[MAX_URI_CHAR_LEN + 1];           //!< The URL for the request
 ++     CHAR certPath[MAX_PATH_LEN + 1];          //!< CA Certificate path to use - optional
 ++     CHAR sslCertPath[MAX_PATH_LEN + 1];       //!< SSL Certificate file path to use - optional
-++@@ -669,6 +686,41 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
+++@@ -700,6 +717,42 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
 ++  */
 ++ PUBLIC_API STATUS freeIotCredentialProvider(PAwsCredentialProvider*);
 ++ 
++++
 +++/**
 +++ * @brief Creates an ECS based AWS credential provider object using libWebSockets
 +++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/token-exchange-service-component.html
@@ -156,7 +162,7 @@ index 000000000..7d662ccad
 +++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
 +++ *
 +++ * @return STATUS code of the execution. STATUS_SUCCESS on success
-+++ */
+++++ */
 +++PUBLIC_API STATUS createLwsEcsCredentialProvider(PCHAR, PCHAR, PAwsCredentialProvider*);
 +++
 +++/**
@@ -184,7 +190,7 @@ index 000000000..7d662ccad
 ++ /**
 ++  * @brief Creates a File based AWS credential provider object
 ++  *
-++@@ -720,7 +772,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
+++@@ -751,7 +804,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
 ++  *
 ++  * @return STATUS code of the execution. STATUS_SUCCESS on success
 ++  */
@@ -563,7 +569,7 @@ index 000000000..7d662ccad
 +++#endif
 +++#endif /* __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
 ++diff --git a/src/source/Common/Include_i.h b/src/source/Common/Include_i.h
-++index 56ae2ae..f931b57 100644
+++index 60928c5..3286179 100644
 ++--- a/src/source/Common/Include_i.h
 +++++ b/src/source/Common/Include_i.h
 ++@@ -73,9 +73,11 @@ typedef struct __CRYPTO_dynlock_value* PCRYPTO_dynlock_value;
@@ -579,23 +585,23 @@ index 000000000..7d662ccad
 ++ #include "Util.h"
 ++ #include "RequestInfo.h"
 ++diff --git a/src/source/Common/IotCredentialProvider.c b/src/source/Common/IotCredentialProvider.c
-++index a61218c..c95af1d 100644
+++index 4e06046..3ce44c0 100644
 ++--- a/src/source/Common/IotCredentialProvider.c
 +++++ b/src/source/Common/IotCredentialProvider.c
-++@@ -214,7 +214,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
-++     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_FAILED);
+++@@ -229,7 +229,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
+++     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_INVALID_URI_LEN);
 ++ 
 ++     // Form a new request info based on the params
 ++-    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
 +++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_SSL_PORT_NUMBER, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
 ++                                  pIotCredentialProvider->privateKeyPath, SSL_CERTIFICATE_TYPE_PEM, DEFAULT_USER_AGENT_NAME,
-++                                  IOT_REQUEST_CONNECTION_TIMEOUT, IOT_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
+++                                  pIotCredentialProvider->connectionTimeout, pIotCredentialProvider->completionTimeout, DEFAULT_LOW_SPEED_LIMIT,
 ++                                  DEFAULT_LOW_SPEED_TIME_LIMIT, pIotCredentialProvider->pAwsCredentials, &pRequestInfo));
 ++diff --git a/src/source/Common/Lws/LwsCall.c b/src/source/Common/Lws/LwsCall.c
-++index f06b588..cc069dd 100644
+++index fb56a05..267b723 100644
 ++--- a/src/source/Common/Lws/LwsCall.c
 +++++ b/src/source/Common/Lws/LwsCall.c
-++@@ -88,6 +88,90 @@ CleanUp:
+++@@ -93,6 +93,90 @@ CleanUp:
 ++     return retStatus;
 ++ }
 ++ 
@@ -686,13 +692,6 @@ index 000000000..7d662ccad
 ++ INT32 lwsIotCallbackRoutine(struct lws* wsi, enum lws_callback_reasons reason, PVOID user, PVOID pDataIn, size_t dataSize)
 ++ {
 ++     UNUSED_PARAM(user);
-++@@ -259,4 +343,4 @@ CleanUp:
-++     } else {
-++         return retValue;
-++     }
-++-}
-++\ No newline at end of file
-+++}
 ++diff --git a/src/source/Common/Lws/LwsCall.h b/src/source/Common/Lws/LwsCall.h
 ++index e334506..2601250 100644
 ++--- a/src/source/Common/Lws/LwsCall.h
@@ -750,7 +749,7 @@ index 000000000..7d662ccad
 +++#endif
 +++#endif /* __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
 ++diff --git a/src/source/Common/RequestInfo.c b/src/source/Common/RequestInfo.c
-++index adda706..f38e280 100644
+++index a3890ed..e7dc052 100644
 ++--- a/src/source/Common/RequestInfo.c
 +++++ b/src/source/Common/RequestInfo.c
 ++@@ -1,7 +1,7 @@
@@ -770,22 +769,32 @@ index 000000000..7d662ccad
 ++     pRequestInfo->currentTime = GETTIME();
 ++     pRequestInfo->callAfter = pRequestInfo->currentTime;
 ++     STRNCPY(pRequestInfo->region, region, MAX_REGION_NAME_LEN);
+++@@ -340,4 +341,4 @@ STATUS releaseCallInfo(PCallInfo pCallInfo)
+++ CleanUp:
+++ 
+++     return retStatus;
+++-}
+++\ No newline at end of file
++++}
 ++-- 
-++2.20.1 (Apple Git-117)
+++2.25.1
 ++
 +diff --git a/CMakeLists.txt b/CMakeLists.txt
-+index 52b6fcecb..be5b26980 100644
++old mode 100644
++new mode 100755
++index 7bcfb871c..e62e99e7f
 +--- a/CMakeLists.txt
 ++++ b/CMakeLists.txt
-+@@ -276,13 +276,13 @@ include_directories(${OPEN_SRC_INSTALL_PREFIX}/include)
-+ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
-+ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
++@@ -331,6 +331,8 @@ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
 + 
-+-add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
++ add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES} ${DATACHANNEL_SRC})
 + 
-++add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
 ++target_include_directories(kvsWebrtcClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
-+ target_link_libraries(
+++
++ if(USE_MBEDTLS)
++   target_compile_definitions(kvsWebrtcClient PRIVATE LWS_WITH_MBEDTLS)
++ endif()
++@@ -339,7 +341,6 @@ target_link_libraries(
 +   kvsWebrtcClient
 +   PRIVATE kvspicUtils
 +           kvspicState
@@ -793,7 +802,7 @@ index 000000000..7d662ccad
 +           ${OPENSSL_SSL_LIBRARY}
 +           ${OPENSSL_CRYPTO_LIBRARY}
 +           ${SRTP_LIBRARIES}
-+@@ -290,9 +290,11 @@ target_link_libraries(
++@@ -347,10 +348,13 @@ target_link_libraries(
 +           ${MBEDTLS_LIBRARIES}
 +           ${GPERFTOOLS_MALLOC_LIBRARIES}
 +           ${GPERFTOOLS_PROFILER_LIBRARIES}
@@ -802,11 +811,13 @@ index 000000000..7d662ccad
 ++          ${CMAKE_THREAD_LIBS_INIT})
 + 
 + add_library(kvsWebrtcSignalingClient ${LINKAGE} ${WEBRTC_SIGNALING_CLIENT_SOURCE_FILES})
-++target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
 + 
-+ target_link_libraries(
-+   kvsWebrtcSignalingClient
-+@@ -301,13 +303,13 @@ target_link_libraries(
+++target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
+++
++ if(USE_MBEDTLS)
++   target_compile_definitions(kvsWebrtcSignalingClient PRIVATE LWS_WITH_MBEDTLS)
++ endif()
++@@ -362,13 +366,13 @@ target_link_libraries(
 +         ${LIBWEBSOCKETS_LIBRARIES} 
 +   PRIVATE kvspicUtils
 +          kvspicState
@@ -822,25 +833,15 @@ index 000000000..7d662ccad
 + 
 + if (WIN32)
 +   target_link_libraries(kvsWebrtcClient PRIVATE "Ws2_32" "iphlpapi")
-+diff --git a/samples/Common.c b/samples/Common.c
-+index f1c9f961a..6b0181f0d 100644
-+--- a/samples/Common.c
-++++ b/samples/Common.c
-+@@ -1278,7 +1278,6 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
-+                 // NULL the pointer to avoid it being freed in the cleanup
-+                 pPendingMessageQueue = NULL;
-+             }
-+-
-+             startStats = pSampleConfiguration->iceCandidatePairStatsTimerId == MAX_UINT32;
-+             break;
-+ 
 +diff --git a/src/source/Signaling/LwsApiCalls.c b/src/source/Signaling/LwsApiCalls.c
-+index 0298b5083..19c715d67 100644
++old mode 100644
++new mode 100755
++index 18367e884..930a173db
 +--- a/src/source/Signaling/LwsApiCalls.c
 ++++ b/src/source/Signaling/LwsApiCalls.c
-+@@ -663,10 +663,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++@@ -766,10 +766,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++     // Prepare the json params for the call
 +     SNPRINTF(paramsJson, ARRAY_SIZE(paramsJson), DESCRIBE_CHANNEL_PARAM_JSON_TEMPLATE, pSignalingClient->pChannelInfo->pChannelName);
-+ 
 +     // Create the request info with the body
 +-    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
 +-                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
@@ -852,9 +853,9 @@ index 000000000..7d662ccad
 ++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 ++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
 + 
-+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
-+ 
-+@@ -808,10 +809,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++     // createRequestInfo does not have access to the getCurrentTime callback, this hook is used for tests.
++     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
++@@ -924,10 +925,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
 +              pSignalingClient->pChannelInfo->messageTtl / HUNDREDS_OF_NANOS_IN_A_SECOND, tagsJson);
 + 
 +     // Create the request info with the body
@@ -868,9 +869,9 @@ index 000000000..7d662ccad
 ++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 ++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
 + 
-+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
-+ 
-+@@ -882,10 +884,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
++     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
++         pRequestInfo->currentTime =
++@@ -1010,10 +1012,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
 +              SIGNALING_CHANNEL_PROTOCOL, getStringFromChannelRoleType(pSignalingClient->pChannelInfo->channelRoleType));
 + 
 +     // Create the request info with the body
@@ -884,9 +885,9 @@ index 000000000..7d662ccad
 ++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 ++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
 + 
-+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
-+ 
-+@@ -1013,10 +1016,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
++     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
++         pRequestInfo->currentTime =
++@@ -1153,10 +1156,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
 +              pSignalingClient->clientInfo.signalingClientInfo.clientId);
 + 
 +     // Create the request info with the body
@@ -900,9 +901,9 @@ index 000000000..7d662ccad
 ++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 ++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
 + 
-+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
-+ 
-+@@ -1130,10 +1134,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
++     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
++         pRequestInfo->currentTime =
++@@ -1282,10 +1286,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
 +              pSignalingClient->channelDescription.updateVersion);
 + 
 +     // Create the request info with the body
@@ -916,9 +917,9 @@ index 000000000..7d662ccad
 ++                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 ++                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
 + 
-+     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
-+ 
-+@@ -1239,10 +1244,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
++     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
++         pRequestInfo->currentTime =
++@@ -1403,10 +1408,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
 +     }
 + 
 +     // Create the request info with the body
@@ -938,10 +939,12 @@ index 000000000..7d662ccad
 +2.17.1
 +
 diff --git a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
-index 2420be89b..8db195b1a 100644
+old mode 100644
+new mode 100755
+index 08ae3908d..de0b96fd2
 --- a/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
 +++ b/CMake/Dependencies/libkvsCommonLws-CMakeLists.txt
-@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 2.8)
+@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 3.6.3)
  
  project(libkvsCommonLws-download NONE)
  
@@ -955,42 +958,41 @@ index 2420be89b..8db195b1a 100644
  
  ExternalProject_Add(libkvsCommonLws-download
      GIT_REPOSITORY    https://github.com/awslabs/amazon-kinesis-video-streams-producer-c.git
--    GIT_TAG           d1095356712729d0489e56d1d0e27f5ce0a29fad
-+    GIT_TAG           a8091d1a140fbdcb260ba3c8302aa2e4712d2d91
+     GIT_TAG           178109a5dbfc5288ba5cf7fab1dc1afd5e2e182b
 +    PATCH_COMMAND     ${PATCH_COMMAND}
      PREFIX            ${CMAKE_CURRENT_BINARY_DIR}/build
      CMAKE_ARGS        
        -DCMAKE_INSTALL_PREFIX=${OPEN_SRC_INSTALL_PREFIX}
 diff --git a/CMake/Dependencies/libkvsCommonLws-ecs-support.patch b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
-new file mode 100644
-index 000000000..b3a39242f
+new file mode 100755
+index 000000000..6038a0bf8
 --- /dev/null
 +++ b/CMake/Dependencies/libkvsCommonLws-ecs-support.patch
-@@ -0,0 +1,709 @@
-+From 6725290bf69ff797aebeecf3f99ae9dba89283e8 Mon Sep 17 00:00:00 2001
-+From: yc yang <ycyang@amazon.com>
-+Date: Thu, 8 Jul 2021 22:17:24 +0800
+@@ -0,0 +1,710 @@
++From 71f5f21bdd7de8f3aa75a265d090a343f1a40795 Mon Sep 17 00:00:00 2001
++From: Ubuntu <ubuntu@ip-172-31-27-105.ec2.internal>
++Date: Tue, 5 Sep 2023 07:57:27 +0000
 +Subject: [PATCH] ecs-support-patch
 +
 +---
-+ .../amazonaws/kinesis/video/common/Include.h  |  54 +++-
++ .../amazonaws/kinesis/video/common/Include.h  |  55 +++-
 + src/source/Common/EcsCredentialProvider.c     | 293 ++++++++++++++++++
 + src/source/Common/EcsCredentialProvider.h     |  64 ++++
 + src/source/Common/Include_i.h                 |   2 +
 + src/source/Common/IotCredentialProvider.c     |   2 +-
-+ src/source/Common/Lws/LwsCall.c               |  86 ++++-
++ src/source/Common/Lws/LwsCall.c               |  84 +++++
 + src/source/Common/Lws/LwsCall.h               |   1 +
 + .../Common/Lws/LwsEcsCredentialProvider.c     |  16 +
 + .../Common/Lws/LwsEcsCredentialProvider.h     |  16 +
-+ src/source/Common/RequestInfo.c               |   3 +-
-+ 10 files changed, 533 insertions(+), 4 deletions(-)
++ src/source/Common/RequestInfo.c               |   5 +-
++ 10 files changed, 534 insertions(+), 4 deletions(-)
 + create mode 100644 src/source/Common/EcsCredentialProvider.c
 + create mode 100644 src/source/Common/EcsCredentialProvider.h
 + create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.c
 + create mode 100644 src/source/Common/Lws/LwsEcsCredentialProvider.h
 +
 +diff --git a/src/include/com/amazonaws/kinesis/video/common/Include.h b/src/include/com/amazonaws/kinesis/video/common/Include.h
-+index 17080ca..b34256e 100644
++index 730b0b2..dd63ed3 100644
 +--- a/src/include/com/amazonaws/kinesis/video/common/Include.h
 ++++ b/src/include/com/amazonaws/kinesis/video/common/Include.h
 +@@ -50,6 +50,11 @@ extern "C" {
@@ -1004,8 +1006,8 @@ index 000000000..b3a39242f
 ++#define STATUS_ECS_URI_LENGTH                               STATUS_COMMON_PRODUCER_BASE + 0x00000029
 + /*!@} */
 + 
-+ /**
-+@@ -137,6 +142,11 @@ extern "C" {
++ ////////////////////////////////////////////////////
++@@ -143,6 +148,11 @@ extern "C" {
 +  */
 + #define MAX_IOT_THING_NAME_LEN MAX_STREAM_NAME_LEN
 + 
@@ -1017,7 +1019,7 @@ index 000000000..b3a39242f
 + /**
 +  * Maximum allowed request header length
 +  */
-+@@ -259,6 +269,7 @@ extern "C" {
++@@ -270,6 +280,7 @@ extern "C" {
 +  * HTTPS Protocol scheme name
 +  */
 + #define HTTPS_SCHEME_NAME "https"
@@ -1025,7 +1027,7 @@ index 000000000..b3a39242f
 + 
 + /**
 +  * WSS Protocol scheme name
-+@@ -283,6 +294,11 @@ extern "C" {
++@@ -294,6 +305,11 @@ extern "C" {
 +  */
 + #define SCHEMA_DELIMITER_STRING (PCHAR) "://"
 + 
@@ -1037,7 +1039,7 @@ index 000000000..b3a39242f
 + /**
 +  * Default canonical URI if we fail to get anything from the parsing
 +  */
-+@@ -471,6 +487,7 @@ struct __RequestInfo {
++@@ -482,6 +498,7 @@ struct __RequestInfo {
 +                                               //!< NOTE: In streaming mode the body will be NULL
 +                                               //!< NOTE: The body will follow the main struct
 +     UINT32 bodySize;                          //!< Size of the body in bytes
@@ -1045,10 +1047,11 @@ index 000000000..b3a39242f
 +     CHAR url[MAX_URI_CHAR_LEN + 1];           //!< The URL for the request
 +     CHAR certPath[MAX_PATH_LEN + 1];          //!< CA Certificate path to use - optional
 +     CHAR sslCertPath[MAX_PATH_LEN + 1];       //!< SSL Certificate file path to use - optional
-+@@ -669,6 +686,41 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
++@@ -700,6 +717,42 @@ PUBLIC_API STATUS createLwsIotCredentialProviderWithTime(PCHAR, PCHAR, PCHAR, PC
 +  */
 + PUBLIC_API STATUS freeIotCredentialProvider(PAwsCredentialProvider*);
 + 
+++
 ++/**
 ++ * @brief Creates an ECS based AWS credential provider object using libWebSockets
 ++ *        https://docs.aws.amazon.com/greengrass/v2/developerguide/token-exchange-service-component.html
@@ -1059,7 +1062,7 @@ index 000000000..b3a39242f
 ++ * @param[out] PAwsCredentialProvider* Constructed AWS credentials provider object
 ++ *
 ++ * @return STATUS code of the execution. STATUS_SUCCESS on success
-++ */
++++ */
 ++PUBLIC_API STATUS createLwsEcsCredentialProvider(PCHAR, PCHAR, PAwsCredentialProvider*);
 ++
 ++/**
@@ -1087,7 +1090,7 @@ index 000000000..b3a39242f
 + /**
 +  * @brief Creates a File based AWS credential provider object
 +  *
-+@@ -720,7 +772,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
++@@ -751,7 +804,7 @@ PUBLIC_API STATUS freeFileCredentialProvider(PAwsCredentialProvider*);
 +  *
 +  * @return STATUS code of the execution. STATUS_SUCCESS on success
 +  */
@@ -1466,7 +1469,7 @@ index 000000000..b3a39242f
 ++#endif
 ++#endif /* __KINESIS_VIDEO_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
 +diff --git a/src/source/Common/Include_i.h b/src/source/Common/Include_i.h
-+index 56ae2ae..f931b57 100644
++index 60928c5..3286179 100644
 +--- a/src/source/Common/Include_i.h
 ++++ b/src/source/Common/Include_i.h
 +@@ -73,9 +73,11 @@ typedef struct __CRYPTO_dynlock_value* PCRYPTO_dynlock_value;
@@ -1482,23 +1485,23 @@ index 000000000..b3a39242f
 + #include "Util.h"
 + #include "RequestInfo.h"
 +diff --git a/src/source/Common/IotCredentialProvider.c b/src/source/Common/IotCredentialProvider.c
-+index a61218c..c95af1d 100644
++index 4e06046..3ce44c0 100644
 +--- a/src/source/Common/IotCredentialProvider.c
 ++++ b/src/source/Common/IotCredentialProvider.c
-+@@ -214,7 +214,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
-+     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_FAILED);
++@@ -229,7 +229,7 @@ STATUS iotCurlHandler(PIotCredentialProvider pIotCredentialProvider)
++     CHK(formatLen > 0 && formatLen < MAX_URI_CHAR_LEN, STATUS_IOT_INVALID_URI_LEN);
 + 
 +     // Form a new request info based on the params
 +-    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
 ++    CHK_STATUS(createRequestInfo(serviceUrl, NULL, DEFAULT_SSL_PORT_NUMBER, DEFAULT_AWS_REGION, pIotCredentialProvider->caCertPath, pIotCredentialProvider->certPath,
 +                                  pIotCredentialProvider->privateKeyPath, SSL_CERTIFICATE_TYPE_PEM, DEFAULT_USER_AGENT_NAME,
-+                                  IOT_REQUEST_CONNECTION_TIMEOUT, IOT_REQUEST_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT,
++                                  pIotCredentialProvider->connectionTimeout, pIotCredentialProvider->completionTimeout, DEFAULT_LOW_SPEED_LIMIT,
 +                                  DEFAULT_LOW_SPEED_TIME_LIMIT, pIotCredentialProvider->pAwsCredentials, &pRequestInfo));
 +diff --git a/src/source/Common/Lws/LwsCall.c b/src/source/Common/Lws/LwsCall.c
-+index f06b588..cc069dd 100644
++index fb56a05..267b723 100644
 +--- a/src/source/Common/Lws/LwsCall.c
 ++++ b/src/source/Common/Lws/LwsCall.c
-+@@ -88,6 +88,90 @@ CleanUp:
++@@ -93,6 +93,90 @@ CleanUp:
 +     return retStatus;
 + }
 + 
@@ -1589,13 +1592,6 @@ index 000000000..b3a39242f
 + INT32 lwsIotCallbackRoutine(struct lws* wsi, enum lws_callback_reasons reason, PVOID user, PVOID pDataIn, size_t dataSize)
 + {
 +     UNUSED_PARAM(user);
-+@@ -259,4 +343,4 @@ CleanUp:
-+     } else {
-+         return retValue;
-+     }
-+-}
-+\ No newline at end of file
-++}
 +diff --git a/src/source/Common/Lws/LwsCall.h b/src/source/Common/Lws/LwsCall.h
 +index e334506..2601250 100644
 +--- a/src/source/Common/Lws/LwsCall.h
@@ -1653,7 +1649,7 @@ index 000000000..b3a39242f
 ++#endif
 ++#endif /* __KINESIS_VIDEO_LWS_ECS_CREDENTIAL_PROVIDER_INCLUDE_I__ */
 +diff --git a/src/source/Common/RequestInfo.c b/src/source/Common/RequestInfo.c
-+index adda706..f38e280 100644
++index a3890ed..e7dc052 100644
 +--- a/src/source/Common/RequestInfo.c
 ++++ b/src/source/Common/RequestInfo.c
 +@@ -1,7 +1,7 @@
@@ -1673,22 +1669,32 @@ index 000000000..b3a39242f
 +     pRequestInfo->currentTime = GETTIME();
 +     pRequestInfo->callAfter = pRequestInfo->currentTime;
 +     STRNCPY(pRequestInfo->region, region, MAX_REGION_NAME_LEN);
++@@ -340,4 +341,4 @@ STATUS releaseCallInfo(PCallInfo pCallInfo)
++ CleanUp:
++ 
++     return retStatus;
++-}
++\ No newline at end of file
+++}
 +-- 
-+2.20.1 (Apple Git-117)
++2.25.1
 +
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 52b6fcecb..be5b26980 100644
+old mode 100644
+new mode 100755
+index 7bcfb871c..e62e99e7f
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -276,13 +276,13 @@ include_directories(${OPEN_SRC_INSTALL_PREFIX}/include)
- include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
- include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
+@@ -331,6 +331,8 @@ include_directories(${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/ice)
  
--add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
+ add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES} ${DATACHANNEL_SRC})
  
-+add_library(kvsWebrtcClient ${LINKAGE} ${WEBRTC_CLIENT_SOURCE_FILES})
 +target_include_directories(kvsWebrtcClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
- target_link_libraries(
++
+ if(USE_MBEDTLS)
+   target_compile_definitions(kvsWebrtcClient PRIVATE LWS_WITH_MBEDTLS)
+ endif()
+@@ -339,7 +341,6 @@ target_link_libraries(
    kvsWebrtcClient
    PRIVATE kvspicUtils
            kvspicState
@@ -1696,7 +1702,7 @@ index 52b6fcecb..be5b26980 100644
            ${OPENSSL_SSL_LIBRARY}
            ${OPENSSL_CRYPTO_LIBRARY}
            ${SRTP_LIBRARIES}
-@@ -290,9 +290,11 @@ target_link_libraries(
+@@ -347,10 +348,13 @@ target_link_libraries(
            ${MBEDTLS_LIBRARIES}
            ${GPERFTOOLS_MALLOC_LIBRARIES}
            ${GPERFTOOLS_PROFILER_LIBRARIES}
@@ -1705,11 +1711,13 @@ index 52b6fcecb..be5b26980 100644
 +          ${CMAKE_THREAD_LIBS_INIT})
  
  add_library(kvsWebrtcSignalingClient ${LINKAGE} ${WEBRTC_SIGNALING_CLIENT_SOURCE_FILES})
-+target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
  
- target_link_libraries(
-   kvsWebrtcSignalingClient
-@@ -301,13 +303,13 @@ target_link_libraries(
++target_include_directories(kvsWebrtcSignalingClient PUBLIC ${KINESIS_VIDEO_WEBRTC_CLIENT_SRC}/src/include)
++
+ if(USE_MBEDTLS)
+   target_compile_definitions(kvsWebrtcSignalingClient PRIVATE LWS_WITH_MBEDTLS)
+ endif()
+@@ -362,13 +366,13 @@ target_link_libraries(
          ${LIBWEBSOCKETS_LIBRARIES} 
    PRIVATE kvspicUtils
           kvspicState
@@ -1725,25 +1733,15 @@ index 52b6fcecb..be5b26980 100644
  
  if (WIN32)
    target_link_libraries(kvsWebrtcClient PRIVATE "Ws2_32" "iphlpapi")
-diff --git a/samples/Common.c b/samples/Common.c
-index f1c9f961a..6b0181f0d 100644
---- a/samples/Common.c
-+++ b/samples/Common.c
-@@ -1278,7 +1278,6 @@ STATUS signalingMessageReceived(UINT64 customData, PReceivedSignalingMessage pRe
-                 // NULL the pointer to avoid it being freed in the cleanup
-                 pPendingMessageQueue = NULL;
-             }
--
-             startStats = pSampleConfiguration->iceCandidatePairStatsTimerId == MAX_UINT32;
-             break;
- 
 diff --git a/src/source/Signaling/LwsApiCalls.c b/src/source/Signaling/LwsApiCalls.c
-index 0298b5083..19c715d67 100644
+old mode 100644
+new mode 100755
+index 18367e884..930a173db
 --- a/src/source/Signaling/LwsApiCalls.c
 +++ b/src/source/Signaling/LwsApiCalls.c
-@@ -663,10 +663,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+@@ -766,10 +766,11 @@ STATUS describeChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+     // Prepare the json params for the call
      SNPRINTF(paramsJson, ARRAY_SIZE(paramsJson), DESCRIBE_CHANNEL_PARAM_JSON_TEMPLATE, pSignalingClient->pChannelInfo->pChannelName);
- 
      // Create the request info with the body
 -    CHK_STATUS(createRequestInfo(url, paramsJson, pSignalingClient->pChannelInfo->pRegion, pSignalingClient->pChannelInfo->pCertPath, NULL, NULL,
 -                                 SSL_CERTIFICATE_TYPE_NOT_SPECIFIED, pSignalingClient->pChannelInfo->pUserAgent,
@@ -1755,9 +1753,9 @@ index 0298b5083..19c715d67 100644
 +                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 +                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
  
-     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
- 
-@@ -808,10 +809,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+     // createRequestInfo does not have access to the getCurrentTime callback, this hook is used for tests.
+     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
+@@ -924,10 +925,11 @@ STATUS createChannelLws(PSignalingClient pSignalingClient, UINT64 time)
               pSignalingClient->pChannelInfo->messageTtl / HUNDREDS_OF_NANOS_IN_A_SECOND, tagsJson);
  
      // Create the request info with the body
@@ -1771,9 +1769,9 @@ index 0298b5083..19c715d67 100644
 +                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 +                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
  
-     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
- 
-@@ -882,10 +884,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
+     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
+         pRequestInfo->currentTime =
+@@ -1010,10 +1012,11 @@ STATUS getChannelEndpointLws(PSignalingClient pSignalingClient, UINT64 time)
               SIGNALING_CHANNEL_PROTOCOL, getStringFromChannelRoleType(pSignalingClient->pChannelInfo->channelRoleType));
  
      // Create the request info with the body
@@ -1787,9 +1785,9 @@ index 0298b5083..19c715d67 100644
 +                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 +                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
  
-     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
- 
-@@ -1013,10 +1016,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
+     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
+         pRequestInfo->currentTime =
+@@ -1153,10 +1156,11 @@ STATUS getIceConfigLws(PSignalingClient pSignalingClient, UINT64 time)
               pSignalingClient->clientInfo.signalingClientInfo.clientId);
  
      // Create the request info with the body
@@ -1803,9 +1801,9 @@ index 0298b5083..19c715d67 100644
 +                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 +                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
  
-     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
- 
-@@ -1130,10 +1134,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
+     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
+         pRequestInfo->currentTime =
+@@ -1282,10 +1286,11 @@ STATUS deleteChannelLws(PSignalingClient pSignalingClient, UINT64 time)
               pSignalingClient->channelDescription.updateVersion);
  
      // Create the request info with the body
@@ -1819,9 +1817,9 @@ index 0298b5083..19c715d67 100644
 +                                 SIGNALING_SERVICE_API_CALL_COMPLETION_TIMEOUT, DEFAULT_LOW_SPEED_LIMIT, DEFAULT_LOW_SPEED_TIME_LIMIT,
 +                                 pSignalingClient->pAwsCredentials, &pRequestInfo));
  
-     CHK_STATUS(createLwsCallInfo(pSignalingClient, pRequestInfo, PROTOCOL_INDEX_HTTPS, &pLwsCallInfo));
- 
-@@ -1239,10 +1244,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
+     if (pSignalingClient->signalingClientCallbacks.getCurrentTimeFn != NULL) {
+         pRequestInfo->currentTime =
+@@ -1403,10 +1408,11 @@ STATUS connectSignalingChannelLws(PSignalingClient pSignalingClient, UINT64 time
      }
  
      // Create the request info with the body
