@@ -60,7 +60,7 @@ cat > components/recipes/$ComponentName-$ComponentVersion.json<<EOF
       "DependencyType": "HARD"
     },
     "aws.greengrass.SecretManager": {
-      "VersionRequirement": "^2.0.0",
+      "VersionRequirement": "^2.1.6",
       "DependencyType": "HARD"
     }
   },
